@@ -14,5 +14,7 @@ jobs:
     - uses: actions/setup-go@v2
       with:
         go-version: '1.14'
-    - name: test
+    - name: Get dependencies
+      run: go get -t ./...
+    - name: Test
       run: go test ./...

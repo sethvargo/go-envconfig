@@ -1,6 +1,6 @@
 # Envconfig
 
-[![GoDoc](https://img.shields.io/badge/GoDoc-reference-007d9c?style=flat-square)](https://pkg.go.dev/github.com/sethvargo/envconfig)
+[![GoDoc](https://img.shields.io/badge/GoDoc-reference-007d9c?style=flat-square)](https://pkg.go.dev/github.com/sethvargo/go-envconfig)
 
 Envconfig populates struct fields based on environment variable
 values.
