@@ -258,7 +258,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				return err
 			}
 
-			if err := ProcessWith(ctx, ef.Interface(), l); err != nil {
+			if err := ProcessWith(ctx, ef.Interface(), l, fns...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 

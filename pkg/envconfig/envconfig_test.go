@@ -48,6 +48,11 @@ func (c *CustomTypeError) EnvDecode(val string) error {
 	return fmt.Errorf("broken")
 }
 
+// valueMutatorFunc is used for testing mutators.
+var valueMutatorFunc MutatorFunc = func(ctx context.Context, k, v string) (string, error) {
+	return fmt.Sprintf("MUTATED_%s", v), nil
+}
+
 // Electron > Lepton > Quark
 type Electron struct {
 	Name   string `env:"ELECTRON_NAME"`
@@ -56,11 +61,26 @@ type Electron struct {
 
 type Lepton struct {
 	Name  string `env:"LEPTON_NAME"`
-	Quark Quark
+	Quark *Quark
 }
 
 type Quark struct {
 	Value int8 `env:"QUARK_VALUE"`
+}
+
+// Sandwich > Bread > Meat
+type Sandwich struct {
+	Name  string `env:"SANDWICH_NAME"`
+	Bread Bread
+}
+
+type Bread struct {
+	Name string `env:"BREAD_NAME"`
+	Meat Meat
+}
+
+type Meat struct {
+	Type string `env:"MEAT_TYPE"`
 }
 
 func TestProcessWith(t *testing.T) {
@@ -71,6 +91,7 @@ func TestProcessWith(t *testing.T) {
 		input    interface{}
 		exp      interface{}
 		lookuper Lookuper
+		mutators []MutatorFunc
 		err      error
 		errMsg   string
 	}{
@@ -847,6 +868,23 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 
+		// Mutators
+		{
+			name: "mutate",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "MUTATED_value",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "value",
+			}),
+			mutators: []MutatorFunc{valueMutatorFunc},
+		},
+
 		// Nesting
 		{
 			name:  "nested_pointer_structs",
@@ -855,7 +893,7 @@ func TestProcessWith(t *testing.T) {
 				Name: "shocking",
 				Lepton: &Lepton{
 					Name: "tea?",
-					Quark: Quark{
+					Quark: &Quark{
 						Value: 2,
 					},
 				},
@@ -866,6 +904,43 @@ func TestProcessWith(t *testing.T) {
 				"QUARK_VALUE":   "2",
 			}),
 		},
+		{
+			name:  "nested_structs",
+			input: &Sandwich{},
+			exp: &Sandwich{
+				Name: "yummy",
+				Bread: Bread{
+					Name: "rye",
+					Meat: Meat{
+						Type: "pep",
+					},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"SANDWICH_NAME": "yummy",
+				"BREAD_NAME":    "rye",
+				"MEAT_TYPE":     "pep",
+			}),
+		},
+		{
+			name:  "nested_mutation",
+			input: &Sandwich{},
+			exp: &Sandwich{
+				Name: "MUTATED_yummy",
+				Bread: Bread{
+					Name: "MUTATED_rye",
+					Meat: Meat{
+						Type: "MUTATED_pep",
+					},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"SANDWICH_NAME": "yummy",
+				"BREAD_NAME":    "rye",
+				"MEAT_TYPE":     "pep",
+			}),
+			mutators: []MutatorFunc{valueMutatorFunc},
+		},
 
 		// Overwriting
 		{
@@ -874,7 +949,7 @@ func TestProcessWith(t *testing.T) {
 				Name: "original",
 				Lepton: &Lepton{
 					Name: "original",
-					Quark: Quark{
+					Quark: &Quark{
 						Value: 1,
 					},
 				},
@@ -883,7 +958,7 @@ func TestProcessWith(t *testing.T) {
 				Name: "original",
 				Lepton: &Lepton{
 					Name: "original",
-					Quark: Quark{
+					Quark: &Quark{
 						Value: 1,
 					},
 				},
@@ -953,7 +1028,7 @@ func TestProcessWith(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			if err := ProcessWith(ctx, tc.input, tc.lookuper); err != nil {
+			if err := ProcessWith(ctx, tc.input, tc.lookuper, tc.mutators...); err != nil {
 				if tc.err == nil && tc.errMsg == "" {
 					t.Fatal(err)
 				}
