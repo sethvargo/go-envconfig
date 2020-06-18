@@ -341,7 +341,7 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 	val, ok := l.Lookup(key)
 	if !ok {
 		if opts.Required {
-			return "", ErrMissingRequired
+			return "", fmt.Errorf("%w: %s", ErrMissingRequired, key)
 		}
 
 		if opts.Default != "" {
