@@ -1,9 +1,11 @@
 # Envconfig
 
-[![GoDoc](https://img.shields.io/badge/GoDoc-reference-007d9c?style=flat-square)](https://pkg.go.dev/github.com/sethvargo/go-envconfig)
+[![GoDoc](https://img.shields.io/badge/GoDoc-reference-007d9c?style=flat-square)](https://pkg.go.dev/github.com/sethvargo/go-envconfig/pkg/envconfig)
 
-Envconfig populates struct fields based on environment variable
-values.
+Envconfig populates struct field values based on environment variables or
+arbitrary lookup functions. It supports pre-setting mutations, which is useful
+for things like converting values to uppercase, trimming whitespace, or looking
+up secrets.
 
 ## Usage
 
@@ -48,6 +50,20 @@ func main() {
 }
 ```
 
+You can also use nested structs, just remember that any fields you want to
+process must be public:
+
+```go
+type MyConfig struct {
+  Database *DatabaseConfig
+}
+
+type DatabaseConfig struct {
+  Port     int    `env:"PORT"`
+  Username string `env:"USERNAME"`
+}
+```
+
 ## Configuration
 
 Use the `env` struct tag to define configuration.
@@ -78,6 +94,20 @@ type MyStruct struct {
 }
 ```
 
+You can also set the default value to another field or value from the
+environment, for example:
+
+```go
+type MyStruct struct {
+  DefaultPort int `env:"DEFAULT_PORT,default=5555"`
+  Port        int `env:"OVERRIDE_PORT,default=$DEFAULT_PORT"`
+}
+```
+
+The value for `Port` will default to the value of `DEFAULT_PORT`.
+
+It is invalid to have a field as both `required` and `default`.
+
 ## Complex Types
 
 ### Durations
@@ -102,7 +132,7 @@ Types that implement `TextUnmarshaler` or `BinaryUnmarshaler` are processed as s
 
 ### Slices
 
-In the environment, slices are specified as comma-separated values:
+Slices are specified as comma-separated values:
 
 ```go
 type MyStruct struct {
@@ -119,7 +149,7 @@ environment.
 
 ### Maps
 
-In the environment, maps are specified as comma-separated key:value pairs:
+Maps are specified as comma-separated key:value pairs:
 
 ```go
 type MyStruct struct {
@@ -168,8 +198,32 @@ func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
 }
 
 var config Config
-ProcessWith(&config, OsLookuper(), resolveSecretFunc)
+envconfig.ProcessWith(ctx, &config, envconfig.OsLookuper(), resolveSecretFunc)
 ```
+
+## Testing
+
+Relying on the environment in tests can be troublesome because environment
+variables are global, which makes it difficult to parallelize the tests.
+Envconfig supports extracting data from anything that returns a value:
+
+```go
+lookuper := envconfig.MapLookuper(map[string]string{
+  "FOO": "bar",
+  "ZIP": "zap",
+})
+
+var config Config
+envconfig.ProcessWith(ctx, &config, lookuper)
+```
+
+Now you can parallelize all your tests by providing a map for the lookup
+function. In fact, that's how the tests in this repo work, so check there for an
+example.
+
+You can also combine multiple lookupers with `MultiLookuper`. See the GoDoc for
+more information and examples.
+
 
 ## Inspiration
 
