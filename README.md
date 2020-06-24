@@ -166,6 +166,30 @@ export MYVAR="a:b,c:d" # map[string]string{"a":"b", "c":"d"}
 Envconfig walks the entire struct, so deeply-nested fields are also supported. You can also define your own decoder (see below).
 
 
+## Prefixing
+
+You can define a custom prefix using the `PrefixLookuper`. This will lookup
+values in the environment by prefixing the keys with the provided value:
+
+```go
+type MyStruct struct {
+  MyVar string `env:"MYVAR"`
+}
+```
+
+```go
+// Process variables, but look for the "APP_" prefix.
+l := envconfig.PrefixLookuper("APP_", envconfig.OsLookuper())
+if err := envconfig.Process(ctx, &c); err != nil {
+  panic(err)
+}
+```
+
+```bash
+export APP_MYVAR="foo"
+```
+
+
 ## Extension
 
 All built-in types are supported except Func and Chan. If you need to define a
