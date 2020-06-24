@@ -1019,6 +1019,22 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{}),
 			err:      ErrUnknownOption,
 		},
+
+		// Prefix
+		{
+			name: "prefix",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "bar",
+			},
+			lookuper: PrefixLookuper("FOO_", MapLookuper(map[string]string{
+				"FOO_FIELD": "bar",
+			})),
+		},
 	}
 
 	for _, tc := range cases {

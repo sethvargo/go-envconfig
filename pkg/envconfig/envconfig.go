@@ -146,6 +146,22 @@ func (m *multiLookuper) Lookup(key string) (string, bool) {
 	return "", false
 }
 
+// PrefixLookuper looks up environment configuration using the specified prefix.
+// This is useful if you want all your variables to start with a particular
+// prefix like "MY_APP_".
+func PrefixLookuper(prefix string, l Lookuper) Lookuper {
+	return &prefixLookuper{prefix: prefix, l: l}
+}
+
+type prefixLookuper struct {
+	prefix string
+	l      Lookuper
+}
+
+func (p *prefixLookuper) Lookup(key string) (string, bool) {
+	return p.l.Lookup(p.prefix + key)
+}
+
 // MultiLookuper wraps a collection of lookupers. It does not combine them, and
 // lookups appear in the order in which they are provided to the initializer.
 func MultiLookuper(lookupers ...Lookuper) Lookuper {
