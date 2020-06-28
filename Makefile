@@ -16,7 +16,7 @@ VETTERS = "asmdecl,assign,atomic,bools,buildtag,cgocall,composites,copylocks,err
 GOFMT_FILES = $(shell go list -f '{{.Dir}}' ./...)
 
 fmtcheck:
-	@command -v goimports > /dev/null 2>&1 || go get golang.org/x/tools/cmd/goimports
+	@command -v goimports > /dev/null 2>&1 || (cd tools && go get golang.org/x/tools/cmd/goimports && cd ..)
 	@CHANGES="$$(goimports -d $(GOFMT_FILES))"; \
 		if [ -n "$${CHANGES}" ]; then \
 			echo "Unformatted (run goimports -w .):\n\n$${CHANGES}\n\n"; \
@@ -31,12 +31,12 @@ fmtcheck:
 .PHONY: fmtcheck
 
 spellcheck:
-	@command -v misspell > /dev/null 2>&1 || go get github.com/client9/misspell/cmd/misspell
+	@command -v misspell > /dev/null 2>&1 || (cd tools && go get github.com/client9/misspell/cmd/misspell && cd ..)
 	@misspell -locale="US" -error -source="text" **/*
 .PHONY: spellcheck
 
 staticcheck:
-	@command -v staticcheck > /dev/null 2>&1 || go get honnef.co/go/tools/cmd/staticcheck
+	@command -v staticcheck > /dev/null 2>&1 || (cd tools && go get honnef.co/go/tools/cmd/staticcheck && cd ..)
 	@staticcheck -checks="all" -tests $(GOFMT_FILES)
 .PHONY: staticcheck
 
