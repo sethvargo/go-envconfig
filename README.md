@@ -180,7 +180,7 @@ type MyStruct struct {
 ```go
 // Process variables, but look for the "APP_" prefix.
 l := envconfig.PrefixLookuper("APP_", envconfig.OsLookuper())
-if err := envconfig.Process(ctx, &c); err != nil {
+if err := envconfig.ProcessWith(ctx, &c, l); err != nil {
   panic(err)
 }
 ```
