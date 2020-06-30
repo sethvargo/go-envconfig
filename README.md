@@ -7,6 +7,9 @@ arbitrary lookup functions. It supports pre-setting mutations, which is useful
 for things like converting values to uppercase, trimming whitespace, or looking
 up secrets.
 
+**Note:** Versions prior to v0.1.3 used a different import path. This README and
+examples are for v0.1.3+.
+
 ## Usage
 
 Define a struct with fields using the `env` tag:
