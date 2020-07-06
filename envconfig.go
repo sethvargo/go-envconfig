@@ -324,13 +324,14 @@ func keyAndOpts(tag string) (string, *options, error) {
 	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
 
 	var opts options
-	for _, o := range tagOpts {
+	for i, o := range tagOpts {
 		o = strings.TrimSpace(o)
 		switch {
 		case o == "required":
 			opts.Required = true
 		case strings.HasPrefix(o, "default="):
-			opts.Default = strings.TrimPrefix(o, "default=")
+			opts.Default = strings.TrimPrefix(strings.Join(tagOpts[i:], ","), "default=")
+			break
 		default:
 			return "", nil, fmt.Errorf("%q: %w", o, ErrUnknownOption)
 		}
