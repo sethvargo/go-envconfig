@@ -324,6 +324,7 @@ func keyAndOpts(tag string) (string, *options, error) {
 	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
 
 	var opts options
+optsLoop:
 	for i, o := range tagOpts {
 		o = strings.TrimSpace(o)
 		switch {
@@ -331,7 +332,7 @@ func keyAndOpts(tag string) (string, *options, error) {
 			opts.Required = true
 		case strings.HasPrefix(o, "default="):
 			opts.Default = strings.TrimPrefix(strings.Join(tagOpts[i:], ","), "default=")
-			break
+			break optsLoop
 		default:
 			return "", nil, fmt.Errorf("%q: %w", o, ErrUnknownOption)
 		}
