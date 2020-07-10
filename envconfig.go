@@ -53,7 +53,7 @@
 //         Password `env:"PASSWORD_SECRET"`
 //     }
 //
-//     func resolveSecretFunc(ctx context.Contxt, key, value string) (string, error) {
+//     func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
 //         if strings.HasPrefix(key, "secret://") {
 //             return secretmanager.Resolve(ctx, value) // example
 //         }
