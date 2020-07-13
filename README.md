@@ -1,6 +1,7 @@
 # Envconfig
 
-[![GoDoc](https://img.shields.io/badge/GoDoc-reference-007d9c?style=flat-square)](https://pkg.go.dev/mod/github.com/sethvargo/go-envconfig)
+[![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://pkg.go.dev/mod/github.com/sethvargo/go-envconfig)
+[![GitHub Actions](https://img.shields.io/github/workflow/status/sethvargo/go-envconfig/Test?style=flat-square)](https://github.com/sethvargo/go-envconfig/actions?query=workflow%3ATest)
 
 Envconfig populates struct field values based on environment variables or
 arbitrary lookup functions. It supports pre-setting mutations, which is useful
