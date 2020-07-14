@@ -133,6 +133,14 @@ export MYVAR="10m" # 10 * time.Minute
 
 Types that implement `TextUnmarshaler` or `BinaryUnmarshaler` are processed as such.
 
+### json.Unmarshaler
+
+Types that implement `json.Unmarshaler` are processed as such.
+
+### gob.Decoder
+
+Types that implement `gob.Decoder` are processed as such.
+
 
 ### Slices
 

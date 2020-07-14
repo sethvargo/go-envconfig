@@ -68,6 +68,8 @@ package envconfig
 import (
 	"context"
 	"encoding"
+	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -381,22 +383,52 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 // processAsDecoder processes the given value as a decoder or custom
 // unmarshaller.
 func processAsDecoder(v string, ef reflect.Value) (bool, error) {
+	// Keep a running error. It's possible that a property might implement
+	// multiple decoders, and we don't know *which* decoder will succeed. If we
+	// get through all of them, we'll return the most recent error.
+	var imp bool
+	var err error
+
 	if ef.CanInterface() {
 		iface := ef.Interface()
+
 		if dec, ok := iface.(Decoder); ok {
-			return true, dec.EnvDecode(v)
+			imp = true
+			if err = dec.EnvDecode(v); err == nil {
+				return true, nil
+			}
 		}
 
 		if tu, ok := iface.(encoding.BinaryUnmarshaler); ok {
-			return true, tu.UnmarshalBinary([]byte(v))
+			imp = true
+			if err = tu.UnmarshalBinary([]byte(v)); err == nil {
+				return true, nil
+			}
+		}
+
+		if tu, ok := iface.(gob.GobDecoder); ok {
+			imp = true
+			if err = tu.GobDecode([]byte(v)); err == nil {
+				return true, nil
+			}
+		}
+
+		if tu, ok := iface.(json.Unmarshaler); ok {
+			imp = true
+			if err = tu.UnmarshalJSON([]byte(v)); err == nil {
+				return true, nil
+			}
 		}
 
 		if tu, ok := iface.(encoding.TextUnmarshaler); ok {
-			return true, tu.UnmarshalText([]byte(v))
+			imp = true
+			if err = tu.UnmarshalText([]byte(v)); err == nil {
+				return true, nil
+			}
 		}
 	}
 
-	return false, nil
+	return imp, err
 }
 
 func processField(v string, ef reflect.Value) error {
