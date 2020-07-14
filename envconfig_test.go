@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -865,6 +866,44 @@ func TestProcessWith(t *testing.T) {
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
+			}),
+		},
+
+		// Marshallers
+		{
+			name: "binarymarshaler",
+			input: &struct {
+				Field url.URL `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field url.URL `env:"FIELD"`
+			}{
+				Field: url.URL{
+					Scheme: "http",
+					Host:   "simple.test",
+					Path:   "/",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "http://simple.test/",
+			}),
+		},
+		{
+			name: "binarymarshaler_pointer",
+			input: &struct {
+				Field *url.URL `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *url.URL `env:"FIELD"`
+			}{
+				Field: &url.URL{
+					Scheme: "http",
+					Host:   "simple.test",
+					Path:   "/",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "http://simple.test/",
 			}),
 		},
 
