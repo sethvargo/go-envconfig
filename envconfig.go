@@ -270,7 +270,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
-			if ok, err := processAsDecoder(val, ef); ok && err != nil {
+			if ok, err := processAsDecoder(val, ef); ok {
 				return err
 			}
 
@@ -412,7 +412,7 @@ func processField(v string, ef reflect.Value) error {
 	tk := tf.Kind()
 
 	// Handle existing decoders.
-	if ok, err := processAsDecoder(v, ef); ok && err != nil {
+	if ok, err := processAsDecoder(v, ef); ok {
 		return err
 	}
 
