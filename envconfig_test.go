@@ -906,6 +906,117 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "http://simple.test/",
 			}),
 		},
+		{
+			name: "gob",
+			input: &struct {
+				Field time.Time `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field time.Time `env:"FIELD"`
+			}{
+				Field: time.Unix(0, 0),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": func() string {
+					v, _ := time.Unix(0, 0).GobEncode()
+					return string(v)
+				}(),
+			}),
+		},
+		{
+			name: "gob_pointer",
+			input: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{
+				Field: func() *time.Time {
+					t := time.Unix(0, 0)
+					return &t
+				}(),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": func() string {
+					v, _ := time.Unix(0, 0).GobEncode()
+					return string(v)
+				}(),
+			}),
+		},
+		{
+			name: "jsonmarshaler",
+			input: &struct {
+				Field time.Time `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field time.Time `env:"FIELD"`
+			}{
+				Field: time.Unix(0, 0),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": func() string {
+					v, _ := time.Unix(0, 0).MarshalJSON()
+					return string(v)
+				}(),
+			}),
+		},
+		{
+			name: "jsonmarshaler_pointer",
+			input: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{
+				Field: func() *time.Time {
+					t := time.Unix(0, 0)
+					return &t
+				}(),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": func() string {
+					v, _ := time.Unix(0, 0).MarshalJSON()
+					return string(v)
+				}(),
+			}),
+		},
+		{
+			name: "textmarshaler",
+			input: &struct {
+				Field time.Time `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field time.Time `env:"FIELD"`
+			}{
+				Field: time.Unix(0, 0),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": func() string {
+					v, _ := time.Unix(0, 0).MarshalText()
+					return string(v)
+				}(),
+			}),
+		},
+		{
+			name: "textmarshaler_pointer",
+			input: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{
+				Field: func() *time.Time {
+					t := time.Unix(0, 0)
+					return &t
+				}(),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": func() string {
+					v, _ := time.Unix(0, 0).MarshalText()
+					return string(v)
+				}(),
+			}),
+		},
 
 		// Mutators
 		{
