@@ -273,7 +273,10 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			}
 
 			if ok, err := processAsDecoder(val, ef); ok {
-				return err
+				if err != nil {
+					return err
+				}
+				continue
 			}
 
 			if err := ProcessWith(ctx, ef.Interface(), l, fns...); err != nil {

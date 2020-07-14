@@ -1185,6 +1185,27 @@ func TestProcessWith(t *testing.T) {
 				"FOO_FIELD": "bar",
 			})),
 		},
+
+		// Issues - this section is specific to reproducing issues
+		{
+			// github.com/sethvargo/go-envconfig/issues/13
+			name: "process_fields_after_decoder",
+			input: &struct {
+				Field1 time.Time `env:"FIELD1"`
+				Field2 string    `env:"FIELD2"`
+			}{},
+			exp: &struct {
+				Field1 time.Time `env:"FIELD1"`
+				Field2 string    `env:"FIELD2"`
+			}{
+				Field1: time.Unix(0, 0),
+				Field2: "bar",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD1": "1970-01-01T00:00:00Z",
+				"FIELD2": "bar",
+			}),
+		},
 	}
 
 	for _, tc := range cases {
