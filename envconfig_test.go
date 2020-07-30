@@ -16,6 +16,7 @@ package envconfig
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -83,6 +84,16 @@ type Bread struct {
 type Meat struct {
 	Type string `env:"MEAT_TYPE"`
 }
+
+type Base64Bytes []byte
+
+func (b *Base64Bytes) EnvDecode(val string) error {
+	var err error
+	*b, err = base64.StdEncoding.DecodeString(val)
+	return err
+}
+
+type Base64ByteSlice []Base64Bytes
 
 func TestProcessWith(t *testing.T) {
 	t.Parallel()
@@ -1204,6 +1215,27 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{
 				"FIELD1": "1970-01-01T00:00:00Z",
 				"FIELD2": "bar",
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/16
+			name: "custom_decoder_nested",
+			input: &struct {
+				Field Base64ByteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field Base64ByteSlice `env:"FIELD"`
+			}{
+				Field: Base64ByteSlice{
+					Base64Bytes("foo"),
+					Base64Bytes("bar"),
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": fmt.Sprintf("%s,%s",
+					base64.StdEncoding.EncodeToString([]byte("foo")),
+					base64.StdEncoding.EncodeToString([]byte("bar")),
+				),
 			}),
 		},
 	}

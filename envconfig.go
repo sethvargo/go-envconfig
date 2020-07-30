@@ -392,6 +392,11 @@ func processAsDecoder(v string, ef reflect.Value) (bool, error) {
 	var imp bool
 	var err error
 
+	// Resolve any pointers.
+	for ef.CanAddr() {
+		ef = ef.Addr()
+	}
+
 	if ef.CanInterface() {
 		iface := ef.Interface()
 
