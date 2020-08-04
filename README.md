@@ -112,6 +112,29 @@ The value for `Port` will default to the value of `DEFAULT_PORT`.
 
 It is invalid to have a field as both `required` and `default`.
 
+### Prefix
+
+For shared, embedded structs, you can define a prefix to use when processing
+struct values for that embed.
+
+```go
+type SharedConfig struct {
+  Port int `env:"PORT,default=5555"`
+}
+
+type Server1 struct {
+  // This processes Port from $FOO_PORT.
+  *SharedConfig `env:",prefix=FOO_"`
+}
+
+type Server2 struct {
+  // This processes Port from $BAR_PORT.
+  *SharedConfig `env:",prefix=BAR_"`
+}
+```
+
+It is invalid to specify a prefix on non-struct fields.
+
 ## Complex Types
 
 ### Durations

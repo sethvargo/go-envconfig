@@ -84,18 +84,28 @@ const (
 
 	optRequired = "required"
 	optDefault  = "default="
+	optPrefix   = "prefix="
 )
 
-var (
-	ErrInvalidMapItem     = fmt.Errorf("invalid map item")
-	ErrLookuperNil        = fmt.Errorf("lookuper cannot be nil")
-	ErrMissingKey         = fmt.Errorf("missing key")
-	ErrMissingRequired    = fmt.Errorf("missing required value")
-	ErrNotPtr             = fmt.Errorf("input must be a pointer")
-	ErrNotStruct          = fmt.Errorf("input must be a struct")
-	ErrPrivateField       = fmt.Errorf("cannot parse private fields")
-	ErrRequiredAndDefault = fmt.Errorf("field cannot be required and have a default value")
-	ErrUnknownOption      = fmt.Errorf("unknown option")
+// Error is a custom error type for errors returned by envconfig.
+type Error string
+
+// Error implements error.
+func (e Error) Error() string {
+	return string(e)
+}
+
+const (
+	ErrInvalidMapItem     = Error("invalid map item")
+	ErrLookuperNil        = Error("lookuper cannot be nil")
+	ErrMissingKey         = Error("missing key")
+	ErrMissingRequired    = Error("missing required value")
+	ErrNotPtr             = Error("input must be a pointer")
+	ErrNotStruct          = Error("input must be a struct")
+	ErrPrefixNotStruct    = Error("prefix is only valid on struct types")
+	ErrPrivateField       = Error("cannot parse private fields")
+	ErrRequiredAndDefault = Error("field cannot be required and have a default value")
+	ErrUnknownOption      = Error("unknown option")
 )
 
 // Lookuper is an interface that provides a lookup for a string-based key.
@@ -197,6 +207,7 @@ type MutatorFunc func(ctx context.Context, k, v string) (string, error)
 type options struct {
 	Default  string
 	Required bool
+	Prefix   string
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
@@ -284,11 +295,20 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				continue
 			}
 
+			if opts.Prefix != "" {
+				l = PrefixLookuper(opts.Prefix, l)
+			}
+
 			if err := ProcessWith(ctx, ef.Interface(), l, fns...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
 			continue
+		}
+
+		// It's invalid to have a prefix on a non-struct field.
+		if opts.Prefix != "" {
+			return ErrPrefixNotStruct
 		}
 
 		// Stop processing if there's no env tag (this comes after nested parsing),
@@ -341,6 +361,8 @@ LOOP:
 		switch {
 		case o == optRequired:
 			opts.Required = true
+		case strings.HasPrefix(o, optPrefix):
+			opts.Prefix = strings.TrimPrefix(o, optPrefix)
 		case strings.HasPrefix(o, optDefault):
 			// If a default value was given, assume everything after is the provided
 			// value, including comma-seprated items.
