@@ -765,6 +765,30 @@ func TestProcessWith(t *testing.T) {
 				"DEFAULT": "bar",
 			}),
 		},
+		{
+			name: "default/slice",
+			input: &struct {
+				Field []string `env:"FIELD,default=foo,bar,baz"`
+			}{},
+			exp: &struct {
+				Field []string `env:"FIELD,default=foo,bar,baz"`
+			}{
+				Field: []string{"foo", "bar", "baz"},
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
+			name: "default/map",
+			input: &struct {
+				Field map[string]string `env:"FIELD,default=foo:bar,zip:zap"`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD,default=foo:bar,zip:zap"`
+			}{
+				Field: map[string]string{"foo": "bar", "zip": "zap"},
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
 
 		// Custom decoder
 		{

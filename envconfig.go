@@ -79,7 +79,12 @@ import (
 	"time"
 )
 
-const envTag = "env"
+const (
+	envTag = "env"
+
+	optRequired = "required"
+	optDefault  = "default="
+)
 
 var (
 	ErrInvalidMapItem     = fmt.Errorf("invalid map item")
@@ -329,13 +334,19 @@ func keyAndOpts(tag string) (string, *options, error) {
 	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
 
 	var opts options
-	for _, o := range tagOpts {
+
+LOOP:
+	for i, o := range tagOpts {
 		o = strings.TrimSpace(o)
 		switch {
-		case o == "required":
+		case o == optRequired:
 			opts.Required = true
-		case strings.HasPrefix(o, "default="):
-			opts.Default = strings.TrimPrefix(o, "default=")
+		case strings.HasPrefix(o, optDefault):
+			// If a default value was given, assume everything after is the provided
+			// value, including comma-seprated items.
+			o = strings.Join(tagOpts[i:], ",")
+			opts.Default = strings.TrimPrefix(o, optDefault)
+			break LOOP
 		default:
 			return "", nil, fmt.Errorf("%q: %w", o, ErrUnknownOption)
 		}
