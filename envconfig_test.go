@@ -85,6 +85,19 @@ type Meat struct {
 	Type string `env:"MEAT_TYPE"`
 }
 
+// Prefixes
+type TV struct {
+	Remote *Remote `env:",prefix=TV_"`
+}
+
+type VCR struct {
+	Remote Remote `env:",prefix=VCR_"`
+}
+
+type Remote struct {
+	Name string `env:"REMOTE_NAME"`
+}
+
 type Base64Bytes []byte
 
 func (b *Base64Bytes) EnvDecode(val string) error {
@@ -1205,9 +1218,9 @@ func TestProcessWith(t *testing.T) {
 			err:      ErrUnknownOption,
 		},
 
-		// Prefix
+		// Lookup prefixes
 		{
-			name: "prefix",
+			name: "lookup_prefixes",
 			input: &struct {
 				Field string `env:"FIELD"`
 			}{},
@@ -1219,6 +1232,40 @@ func TestProcessWith(t *testing.T) {
 			lookuper: PrefixLookuper("FOO_", MapLookuper(map[string]string{
 				"FOO_FIELD": "bar",
 			})),
+		},
+
+		// Embedded prefixes
+		{
+			name:  "embedded_prefixes/pointers",
+			input: &TV{},
+			exp: &TV{
+				Remote: &Remote{
+					Name: "remote",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"TV_REMOTE_NAME": "remote",
+			}),
+		},
+		{
+			name:  "embedded_prefixes/values",
+			input: &VCR{},
+			exp: &VCR{
+				Remote: Remote{
+					Name: "remote",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VCR_REMOTE_NAME": "remote",
+			}),
+		},
+		{
+			name: "embedded_prefixes/error",
+			input: &struct {
+				Field string `env:",prefix=FIELD_"`
+			}{},
+			err:      ErrPrefixNotStruct,
+			lookuper: MapLookuper(map[string]string{}),
 		},
 
 		// Issues - this section is specific to reproducing issues
