@@ -410,7 +410,7 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 		if ok {
 			return s
 		}
-		return i
+		return ""
 	})
 
 	return val, nil
