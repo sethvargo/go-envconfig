@@ -779,6 +779,44 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "default/expand_empty",
+			input: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"DEFAULT": "",
+			}),
+		},
+		{
+			name: "default/expand_nil",
+			input: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "",
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
+			name: "default/expand_nil_typed",
+			input: &struct {
+				Field bool `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field bool `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: false,
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
 			name: "default/slice",
 			input: &struct {
 				Field []string `env:"FIELD,default=foo,bar,baz"`
