@@ -98,14 +98,6 @@ type Remote struct {
 	Name string `env:"REMOTE_NAME"`
 }
 
-type Base64Bytes []byte
-
-func (b *Base64Bytes) EnvDecode(val string) error {
-	var err error
-	*b, err = base64.StdEncoding.DecodeString(val)
-	return err
-}
-
 type Base64ByteSlice []Base64Bytes
 
 func TestProcessWith(t *testing.T) {
