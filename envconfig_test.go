@@ -713,6 +713,20 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "required/present_space",
+			input: &struct {
+				Field string `env:"FIELD, required"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, required"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
 			name: "required/missing",
 			input: &struct {
 				Field string `env:"FIELD,required"`
@@ -721,9 +735,25 @@ func TestProcessWith(t *testing.T) {
 			err:      ErrMissingRequired,
 		},
 		{
+			name: "required/missing_space",
+			input: &struct {
+				Field string `env:"FIELD, required"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			err:      ErrMissingRequired,
+		},
+		{
 			name: "required/default",
 			input: &struct {
 				Field string `env:"FIELD,required,default=foo"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			err:      ErrRequiredAndDefault,
+		},
+		{
+			name: "required/default_space",
+			input: &struct {
+				Field string `env:"FIELD, required, default=foo"`
 			}{},
 			lookuper: MapLookuper(map[string]string{}),
 			err:      ErrRequiredAndDefault,
@@ -737,6 +767,18 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field string `env:"FIELD,default=foo"`
+			}{
+				Field: "foo", // uses default
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
+			name: "default/missing_space",
+			input: &struct {
+				Field string `env:"FIELD, default=foo"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, default=foo"`
 			}{
 				Field: "foo", // uses default
 			},
@@ -757,12 +799,40 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "default/empty_space",
+			input: &struct {
+				Field string `env:"FIELD, default=foo"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, default=foo"`
+			}{
+				Field: "", // doesn't use default
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+		},
+		{
 			name: "default/expand",
 			input: &struct {
 				Field string `env:"FIELD,default=$DEFAULT"`
 			}{},
 			exp: &struct {
 				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "bar",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"DEFAULT": "bar",
+			}),
+		},
+		{
+			name: "default/expand_space",
+			input: &struct {
+				Field string `env:"FIELD, default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, default=$DEFAULT"`
 			}{
 				Field: "bar",
 			},

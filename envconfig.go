@@ -366,7 +366,7 @@ LOOP:
 		case strings.HasPrefix(o, optDefault):
 			// If a default value was given, assume everything after is the provided
 			// value, including comma-seprated items.
-			o = strings.Join(tagOpts[i:], ",")
+			o = strings.TrimLeft(strings.Join(tagOpts[i:], ","), " ")
 			opts.Default = strings.TrimPrefix(o, optDefault)
 			break LOOP
 		default:
