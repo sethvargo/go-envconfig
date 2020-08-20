@@ -167,6 +167,9 @@ func (m *multiLookuper) Lookup(key string) (string, bool) {
 // This is useful if you want all your variables to start with a particular
 // prefix like "MY_APP_".
 func PrefixLookuper(prefix string, l Lookuper) Lookuper {
+	if typ, ok := l.(*prefixLookuper); ok {
+		return &prefixLookuper{prefix: typ.prefix + prefix, l: typ.l}
+	}
 	return &prefixLookuper{prefix: prefix, l: l}
 }
 
@@ -295,11 +298,12 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				continue
 			}
 
+			plu := l
 			if opts.Prefix != "" {
-				l = PrefixLookuper(opts.Prefix, l)
+				plu = PrefixLookuper(opts.Prefix, l)
 			}
 
-			if err := ProcessWith(ctx, ef.Interface(), l, fns...); err != nil {
+			if err := ProcessWith(ctx, ef.Interface(), plu, fns...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 

@@ -88,14 +88,22 @@ type Meat struct {
 // Prefixes
 type TV struct {
 	Remote *Remote `env:",prefix=TV_"`
+	Name   string  `env:"NAME"`
 }
 
 type VCR struct {
 	Remote Remote `env:",prefix=VCR_"`
+	Name   string `env:"NAME"`
 }
 
 type Remote struct {
-	Name string `env:"REMOTE_NAME"`
+	Button *Button `env:",prefix=REMOTE_BUTTON_"`
+	Name   string  `env:"REMOTE_NAME"`
+	Power  bool    `env:"POWER"`
+}
+
+type Button struct {
+	Name string `env:"NAME"`
 }
 
 type Base64ByteSlice []Base64Bytes
@@ -1363,24 +1371,36 @@ func TestProcessWith(t *testing.T) {
 			name:  "embedded_prefixes/pointers",
 			input: &TV{},
 			exp: &TV{
+				Name: "tv",
 				Remote: &Remote{
+					Button: &Button{
+						Name: "button",
+					},
 					Name: "remote",
 				},
 			},
 			lookuper: MapLookuper(map[string]string{
-				"TV_REMOTE_NAME": "remote",
+				"NAME":                  "tv",
+				"TV_REMOTE_NAME":        "remote",
+				"TV_REMOTE_BUTTON_NAME": "button",
 			}),
 		},
 		{
 			name:  "embedded_prefixes/values",
 			input: &VCR{},
 			exp: &VCR{
+				Name: "vcr",
 				Remote: Remote{
+					Button: &Button{
+						Name: "button",
+					},
 					Name: "remote",
 				},
 			},
 			lookuper: MapLookuper(map[string]string{
-				"VCR_REMOTE_NAME": "remote",
+				"NAME":                   "vcr",
+				"VCR_REMOTE_NAME":        "remote",
+				"VCR_REMOTE_BUTTON_NAME": "button",
 			}),
 		},
 		{
