@@ -103,7 +103,7 @@ type Remote struct {
 }
 
 type Button struct {
-	Name string `env:"NAME"`
+	Name string `env:"NAME, default=POWER"`
 }
 
 type Base64ByteSlice []Base64Bytes
@@ -1401,6 +1401,23 @@ func TestProcessWith(t *testing.T) {
 				"NAME":                   "vcr",
 				"VCR_REMOTE_NAME":        "remote",
 				"VCR_REMOTE_BUTTON_NAME": "button",
+			}),
+		},
+		{
+			name:  "embedded_prefixes/defaults",
+			input: &TV{},
+			exp: &TV{
+				Name: "tv",
+				Remote: &Remote{
+					Button: &Button{
+						Name: "POWER",
+					},
+					Name: "remote",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"NAME":           "tv",
+				"TV_REMOTE_NAME": "remote",
 			}),
 		},
 		{
