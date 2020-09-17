@@ -403,19 +403,17 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 		}
 
 		if opts.Default != "" {
-			val = opts.Default
+			// Expand the default value. This allows for a default value that maps to
+			// a different variable.
+			val = os.Expand(opts.Default, func(i string) string {
+				s, ok := l.Lookup(i)
+				if ok {
+					return s
+				}
+				return ""
+			})
 		}
 	}
-
-	// Expand value. This allows for a value or default value that maps to a
-	// different variable.
-	val = os.Expand(val, func(i string) string {
-		s, ok := l.Lookup(i)
-		if ok {
-			return s
-		}
-		return ""
-	})
 
 	return val, nil
 }
