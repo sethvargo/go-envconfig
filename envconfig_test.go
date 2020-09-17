@@ -985,6 +985,22 @@ func TestProcessWith(t *testing.T) {
 			errMsg:   "broken",
 		},
 
+		// Expand
+		{
+			name: "expand/not_default",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "$VALUE",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "$VALUE",
+			}),
+		},
+
 		// Pointer pointers
 		{
 			name: "string_pointer",
