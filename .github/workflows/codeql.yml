@@ -1,4 +1,4 @@
-aname: 'CodeQL'
+name: 'CodeQL'
 
 on:
   push:
