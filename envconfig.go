@@ -98,6 +98,7 @@ func (e Error) Error() string {
 const (
 	ErrInvalidMapItem     = Error("invalid map item")
 	ErrLookuperNil        = Error("lookuper cannot be nil")
+	ErrDeciderNil         = Error("decider function cannot be nil")
 	ErrMissingKey         = Error("missing key")
 	ErrMissingRequired    = Error("missing required value")
 	ErrNotPtr             = Error("input must be a pointer")
@@ -206,6 +207,22 @@ type Decoder interface {
 // variable value before it's converted to the proper type.
 type MutatorFunc func(ctx context.Context, k, v string) (string, error)
 
+// DeciderFunc decides if a set can take place or if it should discard
+// the set of a specific field.
+//
+// When it returns true the set will be performed, and subsequently false
+// for not allowing the set to be performed.
+//
+// For example: return value..IsZero() will only set values that has not
+// been initialized (or is zero).
+type DeciderFunc func(ctx context.Context, value reflect.Value) bool
+
+// DefaultDeciderFunc is a default implementation of DeciderFunc and
+// will only allow sets when nil or zero value for each field.
+var DefaultDeciderFunc = func(ctx context.Context, value reflect.Value) bool {
+	return value.IsZero()
+}
+
 // options are internal options for decoding.
 type options struct {
 	Default  string
@@ -216,14 +233,18 @@ type options struct {
 // Process processes the struct using the environment. See ProcessWith for a
 // more customizable version.
 func Process(ctx context.Context, i interface{}) error {
-	return ProcessWith(ctx, i, OsLookuper())
+	return ProcessWith(ctx, i, OsLookuper(), DefaultDeciderFunc)
 }
 
 // ProcessWith processes the given interface with the given lookuper. See the
 // package-level documentation for specific examples and behaviors.
-func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorFunc) error {
+func ProcessWith(ctx context.Context, i interface{}, l Lookuper, d DeciderFunc, fns ...MutatorFunc) error {
 	if l == nil {
 		return ErrLookuperNil
+	}
+
+	if d == nil {
+		return ErrDeciderNil
 	}
 
 	v := reflect.ValueOf(i)
@@ -303,7 +324,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				plu = PrefixLookuper(opts.Prefix, l)
 			}
 
-			if err := ProcessWith(ctx, ef.Interface(), plu, fns...); err != nil {
+			if err := ProcessWith(ctx, ef.Interface(), plu, d, fns...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
@@ -321,8 +342,8 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			continue
 		}
 
-		// The field already has a non-zero value, do not overwrite.
-		if !ef.IsZero() {
+		// Check wether it should set the field or not via decide function
+		if !d(ctx, ef) {
 			continue
 		}
 

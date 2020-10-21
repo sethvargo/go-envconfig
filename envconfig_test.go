@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1495,7 +1497,7 @@ func TestProcessWith(t *testing.T) {
 			t.Parallel()
 
 			ctx := context.Background()
-			if err := ProcessWith(ctx, tc.input, tc.lookuper, tc.mutators...); err != nil {
+			if err := ProcessWith(ctx, tc.input, tc.lookuper, DefaultDeciderFunc, tc.mutators...); err != nil {
 				if tc.err == nil && tc.errMsg == "" {
 					t.Fatal(err)
 				}
@@ -1526,5 +1528,30 @@ func TestProcessWith(t *testing.T) {
 				t.Fatalf("mismatch (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestProcessWithAlwaysSet(t *testing.T) {
+
+	os.Setenv("QUARK_VALUE", "99")
+	defer os.Unsetenv("QUARK_VALUE")
+
+	q := Quark{Value: 42}
+
+	err := ProcessWith(
+		context.Background(),
+		&q,
+		OsLookuper(),
+		func(ctx context.Context, value reflect.Value) bool {
+			return true // always set
+		},
+	)
+
+	if err != nil {
+		t.Fatalf("Failed to process %#v error: %s", q, err.Error())
+	}
+
+	if 99 != q.Value {
+		t.Fatalf("Expected 99 not %d in Quark.Value", q.Value)
 	}
 }
