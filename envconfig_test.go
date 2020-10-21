@@ -1551,7 +1551,7 @@ func TestProcessWithAlwaysSet(t *testing.T) {
 		t.Fatalf("Failed to process %#v error: %s", q, err.Error())
 	}
 
-	if 99 != q.Value {
+	if q.Value != 99 {
 		t.Fatalf("Expected 99 not %d in Quark.Value", q.Value)
 	}
 }
