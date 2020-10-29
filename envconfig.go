@@ -82,9 +82,10 @@ import (
 const (
 	envTag = "env"
 
-	optRequired = "required"
-	optDefault  = "default="
-	optPrefix   = "prefix="
+	optRequired       = "required"
+	optDefault        = "default="
+	optPrefix         = "prefix="
+	optOpenfaasSecret = "openfaasSecret"
 )
 
 // Error is a custom error type for errors returned by envconfig.
@@ -113,7 +114,7 @@ type Lookuper interface {
 	// Lookup searches for the given key and returns the corresponding string
 	// value. If a value is found, it returns the value and true. If a value is
 	// not found, it returns the empty string and false.
-	Lookup(key string) (string, bool)
+	Lookup(key string, opts *options) (string, bool)
 }
 
 // osLookuper looks up environment configuration from the local environment.
@@ -122,7 +123,11 @@ type osLookuper struct{}
 // Verify implements interface.
 var _ Lookuper = (*osLookuper)(nil)
 
-func (o *osLookuper) Lookup(key string) (string, bool) {
+func (o *osLookuper) Lookup(key string, opts *options) (string, bool) {
+	if opts != nil && opts.OpenfaasSecret {
+		secret := getAPISecret(key)
+		return secret, secret != ""
+	}
 	return os.LookupEnv(key)
 }
 
@@ -136,7 +141,7 @@ type mapLookuper map[string]string
 
 var _ Lookuper = (*mapLookuper)(nil)
 
-func (m mapLookuper) Lookup(key string) (string, bool) {
+func (m mapLookuper) Lookup(key string, opts *options) (string, bool) {
 	v, ok := m[key]
 	return v, ok
 }
@@ -154,9 +159,9 @@ type multiLookuper struct {
 
 var _ Lookuper = (*multiLookuper)(nil)
 
-func (m *multiLookuper) Lookup(key string) (string, bool) {
+func (m *multiLookuper) Lookup(key string, opts *options) (string, bool) {
 	for _, l := range m.ls {
-		if v, ok := l.Lookup(key); ok {
+		if v, ok := l.Lookup(key, opts); ok {
 			return v, true
 		}
 	}
@@ -166,20 +171,21 @@ func (m *multiLookuper) Lookup(key string) (string, bool) {
 // PrefixLookuper looks up environment configuration using the specified prefix.
 // This is useful if you want all your variables to start with a particular
 // prefix like "MY_APP_".
-func PrefixLookuper(prefix string, l Lookuper) Lookuper {
+func PrefixLookuper(prefix string, l Lookuper, opts *options) Lookuper {
 	if typ, ok := l.(*prefixLookuper); ok {
-		return &prefixLookuper{prefix: typ.prefix + prefix, l: typ.l}
+		return &prefixLookuper{prefix: typ.prefix + prefix, l: typ.l, opts: opts}
 	}
-	return &prefixLookuper{prefix: prefix, l: l}
+	return &prefixLookuper{prefix: prefix, l: l, opts: opts}
 }
 
 type prefixLookuper struct {
 	prefix string
 	l      Lookuper
+	opts   *options
 }
 
-func (p *prefixLookuper) Lookup(key string) (string, bool) {
-	return p.l.Lookup(p.prefix + key)
+func (p *prefixLookuper) Lookup(key string, opts *options) (string, bool) {
+	return p.l.Lookup(p.prefix+key, opts)
 }
 
 // MultiLookuper wraps a collection of lookupers. It does not combine them, and
@@ -208,9 +214,10 @@ type MutatorFunc func(ctx context.Context, k, v string) (string, error)
 
 // options are internal options for decoding.
 type options struct {
-	Default  string
-	Required bool
-	Prefix   string
+	Default        string
+	Required       bool
+	Prefix         string
+	OpenfaasSecret bool
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
@@ -257,7 +264,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 		// Parse the key and options.
 		key, opts, err := keyAndOpts(tag)
 		if err != nil {
-			return fmt.Errorf("%s: %w", tf.Name, err)
+			return fmt.Errorf("parsing key options for env tag %s: %w", tf.Name, err)
 		}
 
 		// Initialize pointer structs.
@@ -300,7 +307,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 
 			plu := l
 			if opts.Prefix != "" {
-				plu = PrefixLookuper(opts.Prefix, l)
+				plu = PrefixLookuper(opts.Prefix, l, opts)
 			}
 
 			if err := ProcessWith(ctx, ef.Interface(), plu, fns...); err != nil {
@@ -365,6 +372,8 @@ LOOP:
 		switch {
 		case o == optRequired:
 			opts.Required = true
+		case o == optOpenfaasSecret:
+			opts.OpenfaasSecret = true
 		case strings.HasPrefix(o, optPrefix):
 			opts.Prefix = strings.TrimPrefix(o, optPrefix)
 		case strings.HasPrefix(o, optDefault):
@@ -396,7 +405,7 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 	}
 
 	// Lookup value.
-	val, ok := l.Lookup(key)
+	val, ok := l.Lookup(key, opts)
 	if !ok {
 		if opts.Required {
 			return "", fmt.Errorf("%w: %s", ErrMissingRequired, key)
@@ -406,7 +415,7 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 			// Expand the default value. This allows for a default value that maps to
 			// a different variable.
 			val = os.Expand(opts.Default, func(i string) string {
-				s, ok := l.Lookup(i)
+				s, ok := l.Lookup(i, opts)
 				if ok {
 					return s
 				}

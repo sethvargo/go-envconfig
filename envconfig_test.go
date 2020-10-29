@@ -1379,7 +1379,7 @@ func TestProcessWith(t *testing.T) {
 			},
 			lookuper: PrefixLookuper("FOO_", MapLookuper(map[string]string{
 				"FOO_FIELD": "bar",
-			})),
+			}), nil),
 		},
 
 		// Embedded prefixes
@@ -1485,6 +1485,22 @@ func TestProcessWith(t *testing.T) {
 					base64.StdEncoding.EncodeToString([]byte("bar")),
 				),
 			}),
+		},
+
+
+
+		// Secret
+		{
+			name: "openfaasSecret/test1",
+			input: &struct {
+				Field string `env:"FIELD,openfaasSecret"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,openfaasSecret"`
+			}{
+				Field: "", // uses default
+			},
+			lookuper: MapLookuper(map[string]string{}),
 		},
 	}
 

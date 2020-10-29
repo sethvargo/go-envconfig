@@ -1,4 +1,4 @@
-module github.com/sethvargo/go-envconfig
+module github.com/deltrinos/go-envconfig
 
 go 1.14
 
