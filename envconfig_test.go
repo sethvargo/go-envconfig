@@ -98,7 +98,7 @@ type VCR struct {
 
 type Remote struct {
 	Button *Button `env:",prefix=REMOTE_BUTTON_"`
-	Name   string  `env:"REMOTE_NAME"`
+	Name   string  `env:"REMOTE_NAME,required"`
 	Power  bool    `env:"POWER"`
 }
 
@@ -1484,6 +1484,16 @@ func TestProcessWith(t *testing.T) {
 					base64.StdEncoding.EncodeToString([]byte("foo")),
 					base64.StdEncoding.EncodeToString([]byte("bar")),
 				),
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/28
+			name:   "embedded_prefixes/error-keys",
+			input:  &VCR{},
+			errMsg: "VCR_REMOTE_NAME",
+			lookuper: MapLookuper(map[string]string{
+				"NAME":                   "vcr",
+				"VCR_REMOTE_BUTTON_NAME": "button",
 			}),
 		},
 	}
