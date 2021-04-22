@@ -935,6 +935,16 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{}),
 		},
 
+		// Syntax
+		{
+			name: "syntax/=key",
+			input: &struct {
+				Field CustomType `env:"FIELD=foo"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			err:      ErrInvalidEnvvarName,
+		},
+
 		// Custom decoder
 		{
 			name: "custom_decoder/struct",

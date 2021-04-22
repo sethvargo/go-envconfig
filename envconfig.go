@@ -74,6 +74,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -87,6 +88,8 @@ const (
 	optPrefix   = "prefix="
 )
 
+var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
+
 // Error is a custom error type for errors returned by envconfig.
 type Error string
 
@@ -98,6 +101,7 @@ func (e Error) Error() string {
 const (
 	ErrInvalidMapItem     = Error("invalid map item")
 	ErrLookuperNil        = Error("lookuper cannot be nil")
+	ErrInvalidEnvvarName  = Error("invalid environment variable name")
 	ErrMissingKey         = Error("missing key")
 	ErrMissingRequired    = Error("missing required value")
 	ErrNotPtr             = Error("input must be a pointer")
@@ -356,6 +360,10 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 func keyAndOpts(tag string) (string, *options, error) {
 	parts := strings.Split(tag, ",")
 	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
+
+	if key != "" && !envvarNameRe.MatchString(key) {
+		return "", nil, fmt.Errorf("%q: %w ", key, ErrInvalidEnvvarName)
+	}
 
 	var opts options
 
