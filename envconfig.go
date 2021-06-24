@@ -54,7 +54,7 @@
 //     }
 //
 //     func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
-//         if strings.HasPrefix(key, "secret://") {
+//         if strings.HasPrefix(value, "secret://") {
 //             return secretmanager.Resolve(ctx, value) // example
 //         }
 //         return value, nil
