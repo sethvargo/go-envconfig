@@ -821,6 +821,37 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "default/spaces",
+			input: &struct {
+				Field string `env:"FIELD, default=foo bar baz"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, default=foo bar baz"`
+			}{
+				Field: "", // doesn't use default
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+		},
+		{
+			name: "default/spaces_expand",
+			input: &struct {
+				Field1 string `env:"FIELD1, default=foo"`
+				Field2 string `env:"FIELD2, default=bar $FIELD1"`
+			}{},
+			exp: &struct {
+				Field1 string `env:"FIELD1, default=foo"`
+				Field2 string `env:"FIELD2, default=bar $FIELD1"`
+			}{
+				Field1: "one",
+				Field2: "bar one",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD1": "one",
+			}),
+		},
+		{
 			name: "default/expand",
 			input: &struct {
 				Field string `env:"FIELD,default=$DEFAULT"`
