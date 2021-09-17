@@ -447,38 +447,41 @@ func processAsDecoder(v string, ef reflect.Value) (bool, error) {
 	if ef.CanInterface() {
 		iface := ef.Interface()
 
+		// If a developer chooses to implement the Decoder interface on a type,
+		// never attempt to use other decoders in case of failure. EnvDecode's
+		// decoding logic is "the right one", and the error returned (if any)
+		// is the most specific we can get.
 		if dec, ok := iface.(Decoder); ok {
 			imp = true
-			if err = dec.EnvDecode(v); err == nil {
-				return true, nil
-			}
+			err = dec.EnvDecode(v)
+			return imp, err
 		}
 
 		if tu, ok := iface.(encoding.BinaryUnmarshaler); ok {
 			imp = true
 			if err = tu.UnmarshalBinary([]byte(v)); err == nil {
-				return true, nil
+				return imp, nil
 			}
 		}
 
 		if tu, ok := iface.(gob.GobDecoder); ok {
 			imp = true
 			if err = tu.GobDecode([]byte(v)); err == nil {
-				return true, nil
+				return imp, nil
 			}
 		}
 
 		if tu, ok := iface.(json.Unmarshaler); ok {
 			imp = true
 			if err = tu.UnmarshalJSON([]byte(v)); err == nil {
-				return true, nil
+				return imp, nil
 			}
 		}
 
 		if tu, ok := iface.(encoding.TextUnmarshaler); ok {
 			imp = true
 			if err = tu.UnmarshalText([]byte(v)); err == nil {
-				return true, nil
+				return imp, nil
 			}
 		}
 	}

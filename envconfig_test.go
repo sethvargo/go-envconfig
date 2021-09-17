@@ -16,7 +16,10 @@ package envconfig
 
 import (
 	"context"
+	"encoding"
 	"encoding/base64"
+	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -39,15 +42,37 @@ func (c *CustomType) EnvDecode(val string) error {
 	return nil
 }
 
-var _ Decoder = (*CustomTypeError)(nil)
+var (
+	_ Decoder                    = (*CustomTypeError)(nil)
+	_ encoding.BinaryUnmarshaler = (*CustomTypeError)(nil)
+	_ gob.GobDecoder             = (*CustomTypeError)(nil)
+	_ json.Unmarshaler           = (*CustomTypeError)(nil)
+	_ encoding.TextUnmarshaler   = (*CustomTypeError)(nil)
+)
 
-// CustomTypeError returns an error on the custom decoder.
+// CustomTypeError returns a "broken" error via the custom decoder.
 type CustomTypeError struct {
 	Field string
 }
 
 func (c *CustomTypeError) EnvDecode(val string) error {
 	return fmt.Errorf("broken")
+}
+
+func (c *CustomTypeError) UnmarshalBinary(data []byte) error {
+	return fmt.Errorf("must never be returned")
+}
+
+func (c *CustomTypeError) GobDecode(data []byte) error {
+	return fmt.Errorf("must never be returned")
+}
+
+func (c *CustomTypeError) UnmarshalJSON(data []byte) error {
+	return fmt.Errorf("must never be returned")
+}
+
+func (c *CustomTypeError) UnmarshalText(text []byte) error {
+	return fmt.Errorf("must never be returned")
 }
 
 // valueMutatorFunc is used for testing mutators.
