@@ -228,7 +228,7 @@ export APP_MYVAR="foo"
 ## Extension
 
 All built-in types are supported except Func and Chan. If you need to define a
-custom decoder, implement `Decoder`:
+custom decoder, implement the `Decoder` interface:
 
 ```go
 type MyStruct struct {
@@ -239,6 +239,8 @@ func (v *MyStruct) EnvDecode(val string) error {
   v.field = fmt.Sprintf("PREFIX-%s", val)
   return nil
 }
+
+var _ envconfig.Decoder = (*MyStruct)(nil) // interface check
 ```
 
 If you need to modify environment variable values before processing, you can
