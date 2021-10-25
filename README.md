@@ -198,7 +198,11 @@ export MYVAR="a:b,c:d" # map[string]string{"a":"b", "c":"d"}
 
 ### Structs
 
-Envconfig walks the entire struct, so deeply-nested fields are also supported. You can also define your own decoder (see below).
+Envconfig walks the entire struct, including nested structs, so deeply-nested
+fields are also supported. If a nested struct is a pointer type, it will
+automatically be instantianted to the non-nil value.
+
+You can also define your own decoder for structs (see below).
 
 
 ## Prefixing
