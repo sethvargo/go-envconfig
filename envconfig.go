@@ -83,10 +83,10 @@ import (
 const (
 	envTag = "env"
 
-	optReplace  = "replace"
-	optRequired = "required"
-	optDefault  = "default="
-	optPrefix   = "prefix="
+	optOverwrite = "overwrite"
+	optRequired  = "required"
+	optDefault   = "default="
+	optPrefix    = "prefix="
 )
 
 var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
@@ -213,10 +213,10 @@ type MutatorFunc func(ctx context.Context, k, v string) (string, error)
 
 // options are internal options for decoding.
 type options struct {
-	Default  string
-	Required bool
-	Replace  bool
-	Prefix   string
+	Default   string
+	Overwrite bool
+	Required  bool
+	Prefix    string
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
@@ -327,8 +327,8 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			continue
 		}
 
-		// The field already has a non-zero value and replace is false, do not overwrite.
-		if !ef.IsZero() && !opts.Replace {
+		// The field already has a non-zero value and overwrite is false, do not overwrite.
+		if !ef.IsZero() && !opts.Overwrite {
 			continue
 		}
 
@@ -373,8 +373,8 @@ LOOP:
 	for i, o := range tagOpts {
 		o = strings.TrimSpace(o)
 		switch {
-		case o == optReplace:
-			opts.Replace = true
+		case o == optOverwrite:
+			opts.Overwrite = true
 		case o == optRequired:
 			opts.Required = true
 		case strings.HasPrefix(o, optPrefix):
