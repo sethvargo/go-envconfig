@@ -730,6 +730,40 @@ func TestProcessWith(t *testing.T) {
 			err: ErrPrivateField,
 		},
 
+		// Overwrite
+		{
+			name: "overwrite/present",
+			input: &struct {
+				Field string `env:"FIELD,overwrite"`
+			}{
+				Field: "hello world",
+			},
+			exp: &struct {
+				Field string `env:"FIELD,overwrite"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "overwrite/present_space",
+			input: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{
+				Field: "hello world",
+			},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+
 		// Required
 		{
 			name: "required/present",
