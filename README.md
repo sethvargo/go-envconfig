@@ -72,6 +72,17 @@ type DatabaseConfig struct {
 
 Use the `env` struct tag to define configuration.
 
+### Overwrite
+
+If overwrite is set, the value will be overwritten if there is an
+environment variable match regardless if the value is non-zero.
+
+```go
+type MyStruct struct {
+  Port int `env:"PORT,overwrite"`
+}
+```
+
 ### Required
 
 If a field is required, processing will error if the environment variable is
@@ -298,9 +309,9 @@ major behavioral differences:
 -   Adds support for specifying a custom lookup function (such as a map), which
     is useful for testing.
 
--   Only populates fields if they contain zero or nil values. This means you can
-    pre-initialize a struct and any pre-populated fields will not be overwritten
-    during processing.
+-   Only populates fields if they contain zero or nil values if `overwrite` is unset.
+    This means you can pre-initialize a struct and any pre-populated fields will not
+    be overwritten during processing.
 
 -   Support for interpolation. The default value for a field can be the value of
     another field.
