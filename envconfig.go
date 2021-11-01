@@ -83,6 +83,7 @@ import (
 const (
 	envTag = "env"
 
+	optReplace  = "replace"
 	optRequired = "required"
 	optDefault  = "default="
 	optPrefix   = "prefix="
@@ -214,6 +215,7 @@ type MutatorFunc func(ctx context.Context, k, v string) (string, error)
 type options struct {
 	Default  string
 	Required bool
+	Replace  bool
 	Prefix   string
 }
 
@@ -325,8 +327,8 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			continue
 		}
 
-		// The field already has a non-zero value, do not overwrite.
-		if !ef.IsZero() {
+		// The field already has a non-zero value and replace is false, do not overwrite.
+		if !ef.IsZero() && !opts.Replace {
 			continue
 		}
 
@@ -371,6 +373,8 @@ LOOP:
 	for i, o := range tagOpts {
 		o = strings.TrimSpace(o)
 		switch {
+		case o == optReplace:
+			opts.Replace = true
 		case o == optRequired:
 			opts.Required = true
 		case strings.HasPrefix(o, optPrefix):
