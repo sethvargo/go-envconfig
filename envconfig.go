@@ -266,6 +266,9 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
 
+		var isNilStructPtr bool
+		var old, zero reflect.Value
+
 		// Initialize pointer structs.
 		for ef.Kind() == reflect.Ptr {
 			if ef.IsNil() {
@@ -275,11 +278,18 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 					break
 				}
 
-				// Nil pointer to a struct, create so we can traverse.
-				ef.Set(reflect.New(ef.Type().Elem()))
-			}
+				isNilStructPtr = true
+				zero = reflect.New(ef.Type().Elem()) // a ptr to the zero value
+				old = ef                             // keep the original pointer in case we need to set it later
 
-			ef = ef.Elem()
+				// Use an empty struct of the type instead of setting in place.
+				ef = reflect.New(ef.Type().Elem()).Elem()
+
+				// Nil pointer to a struct, create so we can traverse.
+				// ef.Set(reflect.New(ef.Type().Elem()))
+			} else {
+				ef = ef.Elem()
+			}
 		}
 
 		// Special case handle structs. This has to come after the value resolution in
@@ -301,6 +311,17 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				if err != nil {
 					return err
 				}
+
+				// If the original value is a nil struct ptr,
+				// compare if the updated value is equal to the zero value.
+				// If so, it means nothing was set in the "subtree" so we don't do anything.
+				// Otherwise, set the updated value to the original struct.
+				if isNilStructPtr {
+					if !reflect.DeepEqual(ef.Interface(), zero.Interface()) {
+						old.Set(ef)
+					}
+				}
+
 				continue
 			}
 
@@ -311,6 +332,13 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 
 			if err := ProcessWith(ctx, ef.Interface(), plu, fns...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
+			}
+
+			// Same as above.
+			if isNilStructPtr {
+				if !reflect.DeepEqual(ef.Interface(), zero.Interface()) {
+					old.Set(ef)
+				}
 			}
 
 			continue
