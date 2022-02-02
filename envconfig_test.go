@@ -1597,34 +1597,36 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 
-		// No preemptive init
+		// No init
 		{
-			name: "nopreemptiveinit/no_init_when_sub_fields_set",
+			name: "noinit/no_init_when_sub_fields_set",
 			input: &struct {
 				Sub *struct {
 					Field string `env:"FIELD"`
-				} `env:",nopreemptiveinit"`
+				} `env:",noinit"`
 			}{},
 			exp: &struct {
 				Sub *struct {
 					Field string `env:"FIELD"`
-				} `env:",nopreemptiveinit"`
-			}{},
+				} `env:",noinit"`
+			}{
+				Sub: nil,
+			},
 			// 'Sub' struct ptr shouldn't be initiated
 			// because the 'Field' is not set in the lookuper.
 			lookuper: MapLookuper(map[string]string{}),
 		},
 		{
-			name: "nopreemptiveinit/init_when_sub_fields_set",
+			name: "noinit/init_when_sub_fields_set",
 			input: &struct {
 				Sub *struct {
 					Field string `env:"FIELD"`
-				} `env:",nopreemptiveinit"`
+				} `env:",noinit"`
 			}{},
 			exp: &struct {
 				Sub *struct {
 					Field string `env:"FIELD"`
-				} `env:",nopreemptiveinit"`
+				} `env:",noinit"`
 			}{
 				Sub: &struct {
 					Field string `env:"FIELD"`
@@ -1639,22 +1641,22 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name: "nopreemptiveinit/no_effect_when_not_tagged",
+			name: "noinit/no_effect_on_non_ptr",
 			input: &struct {
-				Sub *struct {
+				Sub struct {
 					Field string `env:"FIELD"`
-				}
+				} `env:",noinit"`
 			}{},
 			exp: &struct {
-				Sub *struct {
+				Sub struct {
 					Field string `env:"FIELD"`
-				}
+				} `env:",noinit"`
 			}{
-				Sub: &struct {
+				Sub: struct {
 					Field string `env:"FIELD"`
 				}{},
 			},
-			// Without the 'nopreemptiveinit' tag,
+			// Without the 'noinit' tag,
 			// 'Sub' will be initiated as a pointer to the empty struct.
 			lookuper: MapLookuper(map[string]string{}),
 		},
