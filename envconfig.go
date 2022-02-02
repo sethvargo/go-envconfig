@@ -87,6 +87,7 @@ const (
 	optRequired  = "required"
 	optDefault   = "default="
 	optPrefix    = "prefix="
+	optNoInit    = "nopreemptiveinit"
 )
 
 var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
@@ -217,6 +218,7 @@ type options struct {
 	Overwrite bool
 	Required  bool
 	Prefix    string
+	NoInit    bool
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
@@ -266,8 +268,16 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
 
-		var isNilStructPtr bool
-		var old, zero reflect.Value
+		isNilStructPtr := false
+		setNilStruct := func(v reflect.Value) {
+			origin := e.Field(i)
+			if isNilStructPtr {
+				empty := reflect.New(origin.Type().Elem()).Interface()
+				if !reflect.DeepEqual(v.Interface(), empty) || !opts.NoInit {
+					origin.Set(v)
+				}
+			}
+		}
 
 		// Initialize pointer structs.
 		for ef.Kind() == reflect.Ptr {
@@ -279,14 +289,9 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				}
 
 				isNilStructPtr = true
-				zero = reflect.New(ef.Type().Elem()) // a ptr to the zero value
-				old = ef                             // keep the original pointer in case we need to set it later
-
-				// Use an empty struct of the type instead of setting in place.
+				// Use an empty struct of the type so we can traverse.
 				ef = reflect.New(ef.Type().Elem()).Elem()
 
-				// Nil pointer to a struct, create so we can traverse.
-				// ef.Set(reflect.New(ef.Type().Elem()))
 			} else {
 				ef = ef.Elem()
 			}
@@ -312,16 +317,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 					return err
 				}
 
-				// If the original value is a nil struct ptr,
-				// compare if the updated value is equal to the zero value.
-				// If so, it means nothing was set in the "subtree" so we don't do anything.
-				// Otherwise, set the updated value to the original struct.
-				if isNilStructPtr {
-					if !reflect.DeepEqual(ef.Interface(), zero.Interface()) {
-						old.Set(ef)
-					}
-				}
-
+				setNilStruct(ef)
 				continue
 			}
 
@@ -334,13 +330,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
-			// Same as above.
-			if isNilStructPtr {
-				if !reflect.DeepEqual(ef.Interface(), zero.Interface()) {
-					old.Set(ef)
-				}
-			}
-
+			setNilStruct(ef)
 			continue
 		}
 
@@ -405,6 +395,8 @@ LOOP:
 			opts.Overwrite = true
 		case o == optRequired:
 			opts.Required = true
+		case o == optNoInit:
+			opts.NoInit = true
 		case strings.HasPrefix(o, optPrefix):
 			opts.Prefix = strings.TrimPrefix(o, optPrefix)
 		case strings.HasPrefix(o, optDefault):

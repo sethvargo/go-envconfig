@@ -1596,6 +1596,68 @@ func TestProcessWith(t *testing.T) {
 				"VCR_REMOTE_BUTTON_NAME": "button",
 			}),
 		},
+
+		// No preemptive init
+		{
+			name: "nopreemptiveinit/no_init_when_sub_fields_set",
+			input: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",nopreemptiveinit"`
+			}{},
+			exp: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",nopreemptiveinit"`
+			}{},
+			// 'Sub' struct ptr shouldn't be initiated
+			// because the 'Field' is not set in the lookuper.
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
+			name: "nopreemptiveinit/init_when_sub_fields_set",
+			input: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",nopreemptiveinit"`
+			}{},
+			exp: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",nopreemptiveinit"`
+			}{
+				Sub: &struct {
+					Field string `env:"FIELD"`
+				}{
+					Field: "banana",
+				},
+			},
+			// 'Sub' struct ptr should be initiated
+			// because the 'Field' is set in the lookuper.
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "banana",
+			}),
+		},
+		{
+			name: "nopreemptiveinit/no_effect_when_not_tagged",
+			input: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				}
+			}{},
+			exp: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				}
+			}{
+				Sub: &struct {
+					Field string `env:"FIELD"`
+				}{},
+			},
+			// Without the 'nopreemptiveinit' tag,
+			// 'Sub' will be initiated as a pointer to the empty struct.
+			lookuper: MapLookuper(map[string]string{}),
+		},
 	}
 
 	for _, tc := range cases {
