@@ -1656,8 +1656,6 @@ func TestProcessWith(t *testing.T) {
 					Field string `env:"FIELD"`
 				}{},
 			},
-			// Without the 'noinit' tag,
-			// 'Sub' will be initiated as a pointer to the empty struct.
 			lookuper: MapLookuper(map[string]string{}),
 		},
 	}
