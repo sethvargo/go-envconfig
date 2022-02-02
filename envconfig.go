@@ -273,6 +273,10 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			origin := e.Field(i)
 			if isNilStructPtr {
 				empty := reflect.New(origin.Type().Elem()).Interface()
+				// If a struct (after traversal) equals to the empty value,
+				// it means nothing was changed in any sub-fields.
+				// With the nopreemptiveinit opt, we skip setting the empty value
+				// to the original struct pointer (aka. keep it nil).
 				if !reflect.DeepEqual(v.Interface(), empty) || !opts.NoInit {
 					origin.Set(v)
 				}
