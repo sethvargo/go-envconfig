@@ -229,7 +229,10 @@ type ChildCfg struct {
 ```
 
 The `noinit` tag is only application for struct pointer fields. Put the tag on
-non-struct-pointer fields won't have any effect.
+non-struct-pointer will return an error.
+
+
+### Custom
 
 You can also define your own decoder for structs (see below).
 

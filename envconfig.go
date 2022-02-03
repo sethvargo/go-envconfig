@@ -101,11 +101,12 @@ func (e Error) Error() string {
 }
 
 const (
+	ErrInvalidEnvvarName  = Error("invalid environment variable name")
 	ErrInvalidMapItem     = Error("invalid map item")
 	ErrLookuperNil        = Error("lookuper cannot be nil")
-	ErrInvalidEnvvarName  = Error("invalid environment variable name")
 	ErrMissingKey         = Error("missing key")
 	ErrMissingRequired    = Error("missing required value")
+	ErrNoInitNotPtr       = Error("field must be a pointer to have noinit")
 	ErrNotPtr             = Error("input must be a pointer")
 	ErrNotStruct          = Error("input must be a struct")
 	ErrPrefixNotStruct    = Error("prefix is only valid on struct types")
@@ -266,6 +267,11 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 		key, opts, err := keyAndOpts(tag)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)
+		}
+
+		// NoInit is only permitted on pointers.
+		if opts.NoInit && ef.Kind() != reflect.Ptr {
+			return fmt.Errorf("%s: %w", tf.Name, ErrNoInitNotPtr)
 		}
 
 		isNilStructPtr := false

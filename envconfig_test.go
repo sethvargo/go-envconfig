@@ -1641,21 +1641,11 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name: "noinit/no_effect_on_non_ptr",
+			name: "noinit/error_not_ptr",
 			input: &struct {
-				Sub struct {
-					Field string `env:"FIELD"`
-				} `env:",noinit"`
+				Field string `env:"FIELD, noinit"`
 			}{},
-			exp: &struct {
-				Sub struct {
-					Field string `env:"FIELD"`
-				} `env:",noinit"`
-			}{
-				Sub: struct {
-					Field string `env:"FIELD"`
-				}{},
-			},
+			err:      ErrNoInitNotPtr,
 			lookuper: MapLookuper(map[string]string{}),
 		},
 	}
