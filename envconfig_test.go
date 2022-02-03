@@ -1596,6 +1596,68 @@ func TestProcessWith(t *testing.T) {
 				"VCR_REMOTE_BUTTON_NAME": "button",
 			}),
 		},
+
+		// No init
+		{
+			name: "noinit/no_init_when_sub_fields_set",
+			input: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",noinit"`
+			}{},
+			exp: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",noinit"`
+			}{
+				Sub: nil,
+			},
+			// 'Sub' struct ptr shouldn't be initiated
+			// because the 'Field' is not set in the lookuper.
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
+			name: "noinit/init_when_sub_fields_set",
+			input: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",noinit"`
+			}{},
+			exp: &struct {
+				Sub *struct {
+					Field string `env:"FIELD"`
+				} `env:",noinit"`
+			}{
+				Sub: &struct {
+					Field string `env:"FIELD"`
+				}{
+					Field: "banana",
+				},
+			},
+			// 'Sub' struct ptr should be initiated
+			// because the 'Field' is set in the lookuper.
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "banana",
+			}),
+		},
+		{
+			name: "noinit/no_effect_on_non_ptr",
+			input: &struct {
+				Sub struct {
+					Field string `env:"FIELD"`
+				} `env:",noinit"`
+			}{},
+			exp: &struct {
+				Sub struct {
+					Field string `env:"FIELD"`
+				} `env:",noinit"`
+			}{
+				Sub: struct {
+					Field string `env:"FIELD"`
+				}{},
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
 	}
 
 	for _, tc := range cases {

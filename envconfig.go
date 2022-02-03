@@ -87,6 +87,7 @@ const (
 	optRequired  = "required"
 	optDefault   = "default="
 	optPrefix    = "prefix="
+	optNoInit    = "noinit"
 )
 
 var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
@@ -217,6 +218,7 @@ type options struct {
 	Overwrite bool
 	Required  bool
 	Prefix    string
+	NoInit    bool
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
@@ -266,6 +268,21 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
 
+		isNilStructPtr := false
+		setNilStruct := func(v reflect.Value) {
+			origin := e.Field(i)
+			if isNilStructPtr {
+				empty := reflect.New(origin.Type().Elem()).Interface()
+				// If a struct (after traversal) equals to the empty value,
+				// it means nothing was changed in any sub-fields.
+				// With the noinit opt, we skip setting the empty value
+				// to the original struct pointer (aka. keep it nil).
+				if !reflect.DeepEqual(v.Interface(), empty) || !opts.NoInit {
+					origin.Set(v)
+				}
+			}
+		}
+
 		// Initialize pointer structs.
 		for ef.Kind() == reflect.Ptr {
 			if ef.IsNil() {
@@ -275,11 +292,13 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 					break
 				}
 
-				// Nil pointer to a struct, create so we can traverse.
-				ef.Set(reflect.New(ef.Type().Elem()))
-			}
+				isNilStructPtr = true
+				// Use an empty struct of the type so we can traverse.
+				ef = reflect.New(ef.Type().Elem()).Elem()
 
-			ef = ef.Elem()
+			} else {
+				ef = ef.Elem()
+			}
 		}
 
 		// Special case handle structs. This has to come after the value resolution in
@@ -301,6 +320,8 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				if err != nil {
 					return err
 				}
+
+				setNilStruct(ef)
 				continue
 			}
 
@@ -313,6 +334,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
+			setNilStruct(ef)
 			continue
 		}
 
@@ -377,6 +399,8 @@ LOOP:
 			opts.Overwrite = true
 		case o == optRequired:
 			opts.Required = true
+		case o == optNoInit:
+			opts.NoInit = true
 		case strings.HasPrefix(o, optPrefix):
 			opts.Prefix = strings.TrimPrefix(o, optPrefix)
 		case strings.HasPrefix(o, optDefault):

@@ -210,8 +210,26 @@ export MYVAR="a:b,c:d" # map[string]string{"a":"b", "c":"d"}
 ### Structs
 
 Envconfig walks the entire struct, including nested structs, so deeply-nested
-fields are also supported. If a nested struct is a pointer type, it will
-automatically be instantianted to the non-nil value.
+fields are also supported.
+
+If a nested struct is a pointer type, it will automatically be instantianted to
+the non-nil value. To disable this behavior, use the tag `noinit`. E.g.
+
+```go
+type ParentCfg struct {
+  // Without `noinit` tag, `Child` would be set to `&ChildCfg{}` whether
+  // or not `FIELD` is set in the env var.
+  // With `noinit`, `Child` would stay nil if `FIELD` is not set in the env var.
+  Child *ChildCfg `env:",noinit"`
+}
+
+type ChildCfg struct {
+  Field string `env:"FIELD"`
+}
+```
+
+The `noinit` tag is only application for struct pointer fields. Put the tag on
+non-struct-pointer fields won't have any effect.
 
 You can also define your own decoder for structs (see below).
 
