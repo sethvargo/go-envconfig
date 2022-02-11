@@ -20,10 +20,11 @@
 //     type MyStruct struct {
 //         A string `env:"A"` // resolves A to $A
 //         B string `env:"B,required"` // resolves B to $B, errors if $B is unset
-//         C string `env:"C,default=foo"` // resolves C to $C, defaults to "foo"
+//         C string `env:"C,notempty"` // resolves C to $C, errors if $C is unset or empty
+//         D string `env:"D,default=foo"` // resolves D to $D, defaults to "foo"
 //
-//         D string `env:"D,required,default=foo"` // error, cannot be required and default
-//         E string `env:""` // error, must specify key
+//         E string `env:"E,required,default=foo"` // error, cannot be required and default
+//         F string `env:""` // error, must specify key
 //     }
 //
 // All built-in types are supported except Func and Chan. If you need to define
@@ -85,6 +86,7 @@ const (
 
 	optOverwrite = "overwrite"
 	optRequired  = "required"
+	optNotEmpty  = "notempty"
 	optDefault   = "default="
 	optPrefix    = "prefix="
 	optNoInit    = "noinit"
@@ -106,6 +108,7 @@ const (
 	ErrLookuperNil        = Error("lookuper cannot be nil")
 	ErrMissingKey         = Error("missing key")
 	ErrMissingRequired    = Error("missing required value")
+	ErrEmpty              = Error("empty value")
 	ErrNoInitNotPtr       = Error("field must be a pointer to have noinit")
 	ErrNotPtr             = Error("input must be a pointer")
 	ErrNotStruct          = Error("input must be a struct")
@@ -218,6 +221,7 @@ type options struct {
 	Default   string
 	Overwrite bool
 	Required  bool
+	NotEmpty  bool
 	Prefix    string
 	NoInit    bool
 }
@@ -405,6 +409,9 @@ LOOP:
 			opts.Overwrite = true
 		case o == optRequired:
 			opts.Required = true
+		case o == optNotEmpty:
+			opts.Required = true
+			opts.NotEmpty = true
 		case o == optNoInit:
 			opts.NoInit = true
 		case strings.HasPrefix(o, optPrefix):
@@ -459,6 +466,10 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 				return ""
 			})
 		}
+	}
+
+	if val == "" && opts.NotEmpty {
+		return "", ErrEmpty
 	}
 
 	return val, nil

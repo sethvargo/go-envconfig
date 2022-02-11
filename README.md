@@ -96,6 +96,19 @@ type MyStruct struct {
 
 It is invalid to have a field as both `required` and `default`.
 
+### Not Empty
+
+If notempty is set, processing will error if the environment variable is
+unset or empty.
+
+```go
+type MyStruct struct {
+  Port int `env:"PORT,notempty"`
+}
+```
+
+It is invalid to have a field as both `notempty` and `default`.
+
 ### Default
 
 If an environment variable is not set, the field will be set to the default

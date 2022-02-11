@@ -826,6 +826,88 @@ func TestProcessWith(t *testing.T) {
 			err:      ErrRequiredAndDefault,
 		},
 
+		// Not Empty
+		{
+			name: "notempty/present",
+			input: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "notempty/present_space",
+			input: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "notempty/missing",
+			input: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			err:      ErrMissingRequired,
+		},
+		{
+			name: "notempty/missing_space",
+			input: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			err:      ErrMissingRequired,
+		},
+		{
+			name: "notempty/empty",
+			input: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			err: ErrEmpty,
+		},
+		{
+			name: "notempty/empty_space",
+			input: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			err: ErrEmpty,
+		},
+		{
+			name: "notempty/default",
+			input: &struct {
+				Field string `env:"FIELD,notempty,default=foo"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			err:      ErrRequiredAndDefault,
+		},
+		{
+			name: "notempty/default_space",
+			input: &struct {
+				Field string `env:"FIELD, notempty, default=foo"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			err:      ErrRequiredAndDefault,
+		},
+
 		// Default
 		{
 			name: "default/missing",
