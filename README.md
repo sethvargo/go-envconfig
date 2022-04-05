@@ -146,6 +146,22 @@ type Server2 struct {
 
 It is invalid to specify a prefix on non-struct fields.
 
+### Separator
+
+By default when parsing maps, `:` is used as key-value separator.
+You can define your own custom separator using `separator`
+
+```go
+type MyStruct struct {
+  MyVar map[string]string `env:"MYVAR,separator=-"`
+}
+```
+
+```bash
+export MYVAR="client-abcd::1/128,backend-abcd::2/128"
+# map[string]string{"client":"abcd::1/128", "backend":"abcd::2/128"}
+```
+
 ## Complex Types
 
 ### Durations
