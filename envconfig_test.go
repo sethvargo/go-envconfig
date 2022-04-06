@@ -661,24 +661,24 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "map/custom_separator",
 			input: &struct {
-				Field map[string]string `env:"FIELD,separator=#"`
+				Field map[string]string `env:"FIELD,separator=="`
 			}{},
 			exp: &struct {
-				Field map[string]string `env:"FIELD,separator=#"`
+				Field map[string]string `env:"FIELD,separator=="`
 			}{
-				Field: map[string]string{"foo": "bar"},
+				Field: map[string]string{"foo": "bar", "zip:zap": "zoo:zil"},
 			},
 			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo#bar",
+				"FIELD": "foo=bar, zip:zap=zoo:zil",
 			}),
 		},
 		{
 			name: "map/custom_separator_error",
 			input: &struct {
-				Field map[string]string `env:"FIELD,separator=#"`
+				Field map[string]string `env:"FIELD,separator=="`
 			}{},
 			exp: &struct {
-				Field map[string]string `env:"FIELD,separator=#"`
+				Field map[string]string `env:"FIELD,separator=="`
 			}{
 				Field: map[string]string{"foo": "bar"},
 			},
