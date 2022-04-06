@@ -146,6 +146,22 @@ type Server2 struct {
 
 It is invalid to specify a prefix on non-struct fields.
 
+### Delimiter
+
+By default when parsing maps and slices, `,` is used as element delimiter.
+You can define your own custom delimiter using `delimiter`
+
+```go
+type MyStruct struct {
+  MyVar map[string]string `env:"MYVAR,delimiter=;"`
+}
+```
+
+```bash
+export MYVAR="a:1;b:2"
+# map[string]string{"a":"1", "b":"2"}
+```
+
 ## Complex Types
 
 ### Durations
