@@ -88,6 +88,7 @@ const (
 	optDefault   = "default="
 	optPrefix    = "prefix="
 	optNoInit    = "noinit"
+	optDelimiter = "delimiter="
 )
 
 var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
@@ -220,6 +221,7 @@ type options struct {
 	Required  bool
 	Prefix    string
 	NoInit    bool
+	Delimiter string
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
@@ -376,8 +378,13 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			}
 		}
 
+    // If Delimiter is not defined set it to ","
+    if opts.Delimiter == "" {
+      opts.Delimiter = ","
+    }
+
 		// Set value.
-		if err := processField(val, ef); err != nil {
+		if err := processField(val, ef, opts.Delimiter); err != nil {
 			return fmt.Errorf("%s(%q): %w", tf.Name, val, err)
 		}
 	}
@@ -409,6 +416,8 @@ LOOP:
 			opts.NoInit = true
 		case strings.HasPrefix(o, optPrefix):
 			opts.Prefix = strings.TrimPrefix(o, optPrefix)
+		case strings.HasPrefix(o, optDelimiter):
+			opts.Delimiter = strings.TrimPrefix(o, optDelimiter)
 		case strings.HasPrefix(o, optDefault):
 			// If a default value was given, assume everything after is the provided
 			// value, including comma-seprated items.
@@ -523,7 +532,7 @@ func processAsDecoder(v string, ef reflect.Value) (bool, error) {
 	return imp, err
 }
 
-func processField(v string, ef reflect.Value) error {
+func processField(v string, ef reflect.Value, delimiter string) error {
 	// Handle pointers and uninitialized pointers.
 	for ef.Type().Kind() == reflect.Ptr {
 		if ef.IsNil() {
@@ -596,7 +605,7 @@ func processField(v string, ef reflect.Value) error {
 
 	// Maps
 	case reflect.Map:
-		vals := strings.Split(v, ",")
+		vals := strings.Split(v, delimiter)
 		mp := reflect.MakeMapWithSize(tf, len(vals))
 		for _, val := range vals {
 			pair := strings.SplitN(val, ":", 2)
@@ -606,12 +615,12 @@ func processField(v string, ef reflect.Value) error {
 			mKey, mVal := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
 
 			k := reflect.New(tf.Key()).Elem()
-			if err := processField(mKey, k); err != nil {
+			if err := processField(mKey, k, delimiter); err != nil {
 				return fmt.Errorf("%s: %w", mKey, err)
 			}
 
 			v := reflect.New(tf.Elem()).Elem()
-			if err := processField(mVal, v); err != nil {
+			if err := processField(mVal, v, delimiter); err != nil {
 				return fmt.Errorf("%s: %w", mVal, err)
 			}
 
@@ -625,11 +634,11 @@ func processField(v string, ef reflect.Value) error {
 		if tf.Elem().Kind() == reflect.Uint8 {
 			ef.Set(reflect.ValueOf([]byte(v)))
 		} else {
-			vals := strings.Split(v, ",")
+			vals := strings.Split(v, delimiter)
 			s := reflect.MakeSlice(tf, len(vals), len(vals))
 			for i, val := range vals {
 				val = strings.TrimSpace(val)
-				if err := processField(val, s.Index(i)); err != nil {
+				if err := processField(val, s.Index(i), delimiter); err != nil {
 					return fmt.Errorf("%s: %w", val, err)
 				}
 			}
