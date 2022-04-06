@@ -644,6 +644,35 @@ func TestProcessWith(t *testing.T) {
 			}),
 			errMsg: "invalid syntax",
 		},
+		{
+			name: "map/separator",
+			input: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{
+				Field: map[string]string{"foo": "bar"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo#bar",
+			}),
+		},
+		{
+			name: "map/separator_error",
+			input: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{
+				Field: map[string]string{"foo": "bar"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo:bar",
+			}),
+			errMsg: "invalid map item",
+		},
 
 		// Slices
 		{
