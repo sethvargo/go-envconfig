@@ -89,6 +89,8 @@ const (
 	optPrefix    = "prefix="
 	optNoInit    = "noinit"
 	optDelimiter = "delimiter="
+
+	defaultDelimeter = ","
 )
 
 var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
@@ -378,10 +380,10 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 			}
 		}
 
-    // If Delimiter is not defined set it to ","
-    if opts.Delimiter == "" {
-      opts.Delimiter = ","
-    }
+		// If Delimiter is not defined set it to ","
+		if opts.Delimiter == "" {
+			opts.Delimiter = defaultDelimeter
+		}
 
 		// Set value.
 		if err := processField(val, ef, opts.Delimiter); err != nil {

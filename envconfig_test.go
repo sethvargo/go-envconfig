@@ -645,31 +645,17 @@ func TestProcessWith(t *testing.T) {
 			errMsg: "invalid syntax",
 		},
 		{
-			name: "map/delimiter_wrong",
+			name: "map/custom_delimiter",
 			input: &struct {
 				Field map[string]string `env:"FIELD,delimiter=;"`
 			}{},
 			exp: &struct {
 				Field map[string]string `env:"FIELD,delimiter=;"`
 			}{
-				Field: map[string]string{"foo": "1,bar:2"},
+				Field: map[string]string{"foo": "1,2", "bar": "3,4", "zip": "zap:zoo,3"},
 			},
 			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo:1,bar:2",
-			}),
-		},
-		{
-			name: "map/delimiter",
-			input: &struct {
-				Field map[string]string `env:"FIELD,delimiter=;"`
-			}{},
-			exp: &struct {
-				Field map[string]string `env:"FIELD,delimiter=;"`
-			}{
-				Field: map[string]string{"foo": "1", "bar" : "2"},
-			},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo:1;bar:2",
+				"FIELD": "foo:1,2;bar:3,4; zip:zap:zoo,3",
 			}),
 		},
 
@@ -731,31 +717,17 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name: "slice/delimiter",
+			name: "slice/custom_delimiter",
 			input: &struct {
 				Field []string `env:"FIELD,delimiter=;"`
 			}{},
 			exp: &struct {
 				Field []string `env:"FIELD,delimiter=;"`
 			}{
-				Field: []string{"foo", "bar"},
+				Field: []string{"foo,bar", "baz"},
 			},
 			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo;bar",
-			}),
-		},
-		{
-			name: "slice/delimiter_wrong",
-			input: &struct {
-				Field []string `env:"FIELD,delimiter=;"`
-			}{},
-			exp: &struct {
-				Field []string `env:"FIELD,delimiter=;"`
-			}{
-				Field: []string{"foo,bar"},
-			},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo,bar",
+				"FIELD": "foo,bar;baz",
 			}),
 		},
 

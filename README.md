@@ -148,7 +148,7 @@ It is invalid to specify a prefix on non-struct fields.
 
 ### Delimiter
 
-By default when parsing maps and slices, `,` is used as element delimiter.
+When parsing maps and slices, a comma (`,`) is used as the element delimiter.
 You can define your own custom delimiter using `delimiter`
 
 ```go
@@ -160,6 +160,14 @@ type MyStruct struct {
 ```bash
 export MYVAR="a:1;b:2"
 # map[string]string{"a":"1", "b":"2"}
+```
+
+This is especially helpful when your values include the default delimeter
+character.
+
+```bash
+export MYVAR="a:1,2,3;b:4,5"
+# map[string]string{"a":"1,2,3", "b":"4,5"}
 ```
 
 ## Complex Types
