@@ -658,6 +658,35 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "foo:1,2;bar:3,4; zip:zap:zoo,3",
 			}),
 		},
+		{
+			name: "map/custom_separator",
+			input: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{
+				Field: map[string]string{"foo": "bar"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo#bar",
+			}),
+		},
+		{
+			name: "map/custom_separator_error",
+			input: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD,separator=#"`
+			}{
+				Field: map[string]string{"foo": "bar"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo:bar",
+			}),
+			errMsg: "invalid map item",
+		},
 
 		// Slices
 		{
