@@ -83,14 +83,16 @@ import (
 const (
 	envTag = "env"
 
-	optOverwrite = "overwrite"
-	optRequired  = "required"
 	optDefault   = "default="
-	optPrefix    = "prefix="
-	optNoInit    = "noinit"
 	optDelimiter = "delimiter="
+	optNoInit    = "noinit"
+	optOverwrite = "overwrite"
+	optPrefix    = "prefix="
+	optRequired  = "required"
+	optSeparator = "separator="
 
-	defaultDelimeter = ","
+	defaultDelimiter = ","
+	defaultSeparator = ":"
 )
 
 var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
@@ -219,11 +221,12 @@ type MutatorFunc func(ctx context.Context, k, v string) (string, error)
 // options are internal options for decoding.
 type options struct {
 	Default   string
-	Overwrite bool
-	Required  bool
-	Prefix    string
-	NoInit    bool
 	Delimiter string
+	NoInit    bool
+	Overwrite bool
+	Prefix    string
+	Required  bool
+	Separator string
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
@@ -382,11 +385,16 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 
 		// If Delimiter is not defined set it to ","
 		if opts.Delimiter == "" {
-			opts.Delimiter = defaultDelimeter
+			opts.Delimiter = defaultDelimiter
+		}
+
+		// If Separator is not defined set it to ":"
+		if opts.Separator == "" {
+			opts.Separator = defaultSeparator
 		}
 
 		// Set value.
-		if err := processField(val, ef, opts.Delimiter); err != nil {
+		if err := processField(val, ef, opts.Delimiter, opts.Separator); err != nil {
 			return fmt.Errorf("%s(%q): %w", tf.Name, val, err)
 		}
 	}
@@ -420,6 +428,8 @@ LOOP:
 			opts.Prefix = strings.TrimPrefix(o, optPrefix)
 		case strings.HasPrefix(o, optDelimiter):
 			opts.Delimiter = strings.TrimPrefix(o, optDelimiter)
+		case strings.HasPrefix(o, optSeparator):
+			opts.Separator = strings.TrimPrefix(o, optSeparator)
 		case strings.HasPrefix(o, optDefault):
 			// If a default value was given, assume everything after is the provided
 			// value, including comma-seprated items.
@@ -534,7 +544,7 @@ func processAsDecoder(v string, ef reflect.Value) (bool, error) {
 	return imp, err
 }
 
-func processField(v string, ef reflect.Value, delimiter string) error {
+func processField(v string, ef reflect.Value, delimiter, separator string) error {
 	// Handle pointers and uninitialized pointers.
 	for ef.Type().Kind() == reflect.Ptr {
 		if ef.IsNil() {
@@ -610,19 +620,19 @@ func processField(v string, ef reflect.Value, delimiter string) error {
 		vals := strings.Split(v, delimiter)
 		mp := reflect.MakeMapWithSize(tf, len(vals))
 		for _, val := range vals {
-			pair := strings.SplitN(val, ":", 2)
+			pair := strings.SplitN(val, separator, 2)
 			if len(pair) < 2 {
 				return fmt.Errorf("%s: %w", val, ErrInvalidMapItem)
 			}
 			mKey, mVal := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
 
 			k := reflect.New(tf.Key()).Elem()
-			if err := processField(mKey, k, delimiter); err != nil {
+			if err := processField(mKey, k, delimiter, separator); err != nil {
 				return fmt.Errorf("%s: %w", mKey, err)
 			}
 
 			v := reflect.New(tf.Elem()).Elem()
-			if err := processField(mVal, v, delimiter); err != nil {
+			if err := processField(mVal, v, delimiter, separator); err != nil {
 				return fmt.Errorf("%s: %w", mVal, err)
 			}
 
@@ -640,7 +650,7 @@ func processField(v string, ef reflect.Value, delimiter string) error {
 			s := reflect.MakeSlice(tf, len(vals), len(vals))
 			for i, val := range vals {
 				val = strings.TrimSpace(val)
-				if err := processField(val, s.Index(i), delimiter); err != nil {
+				if err := processField(val, s.Index(i), delimiter, separator); err != nil {
 					return fmt.Errorf("%s: %w", val, err)
 				}
 			}

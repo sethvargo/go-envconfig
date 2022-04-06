@@ -148,13 +148,12 @@ It is invalid to specify a prefix on non-struct fields.
 
 ### Delimiter
 
-When parsing maps and slices, a comma (`,`) is used as the element delimiter.
-You can define your own custom delimiter using `delimiter`
+When parsing maps and slices, a comma (`,`) is the default element delimiter.
+Define a custom delimiter with `delimiter`:
 
 ```go
 type MyStruct struct {
   MyVar map[string]string `env:"MYVAR,delimiter=;"`
-}
 ```
 
 ```bash
@@ -168,6 +167,30 @@ character.
 ```bash
 export MYVAR="a:1,2,3;b:4,5"
 # map[string]string{"a":"1,2,3", "b":"4,5"}
+```
+
+### Separator
+
+When parsing maps, a colon (`:`) is the default key-value separator. Define a
+separator with `separator`:
+
+```go
+type MyStruct struct {
+  MyVar map[string]string `env:"MYVAR,separator=="`
+}
+```
+
+```bash
+export MYVAR="a=b,c=d"
+# map[string]string{"a":"b", "c":"d"}
+```
+
+This is especially helpful when your keys or values include the default
+separator character.
+
+```bash
+export MYVAR="client=abcd::1/128,backend=abcd::2/128"
+# map[string]string{"client":"abcd::1/128", "backend":"abcd::2/128"}
 ```
 
 ## Complex Types
