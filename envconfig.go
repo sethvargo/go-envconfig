@@ -186,8 +186,8 @@ func PrefixLookuper(prefix string, l Lookuper) Lookuper {
 }
 
 type prefixLookuper struct {
-	prefix string
 	l      Lookuper
+	prefix string
 }
 
 func (p *prefixLookuper) Lookup(key string) (string, bool) {
@@ -222,11 +222,11 @@ type MutatorFunc func(ctx context.Context, k, v string) (string, error)
 type options struct {
 	Default   string
 	Delimiter string
+	Prefix    string
+	Separator string
 	NoInit    bool
 	Overwrite bool
-	Prefix    string
 	Required  bool
-	Separator string
 }
 
 // Process processes the struct using the environment. See ProcessWith for a
