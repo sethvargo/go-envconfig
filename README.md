@@ -161,7 +161,7 @@ export MYVAR="a:1;b:2"
 # map[string]string{"a":"1", "b":"2"}
 ```
 
-This is especially helpful when your values include the default delimeter
+This is especially helpful when your values include the default delimiter
 character.
 
 ```bash
