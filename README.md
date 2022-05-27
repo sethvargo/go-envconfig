@@ -260,23 +260,8 @@ Envconfig walks the entire struct, including nested structs, so deeply-nested
 fields are also supported.
 
 If a nested struct is a pointer type, it will automatically be instantianted to
-the non-nil value. To disable this behavior, use the tag `noinit`. E.g.
-
-```go
-type ParentCfg struct {
-  // Without `noinit` tag, `Child` would be set to `&ChildCfg{}` whether
-  // or not `FIELD` is set in the env var.
-  // With `noinit`, `Child` would stay nil if `FIELD` is not set in the env var.
-  Child *ChildCfg `env:",noinit"`
-}
-
-type ChildCfg struct {
-  Field string `env:"FIELD"`
-}
-```
-
-The `noinit` tag is only application for struct pointer fields. Put the tag on
-non-struct-pointer will return an error.
+the non-nil value. To change this behavior, see
+(Initialization)[#Initialization].
 
 
 ### Custom
@@ -306,6 +291,38 @@ if err := envconfig.ProcessWith(ctx, &c, l); err != nil {
 ```bash
 export APP_MYVAR="foo"
 ```
+
+## Initialization
+
+By default, all pointer fields are initialized (allocated) so they are not
+`nil`. To disable this behavior, use the tag the field as `noinit`:
+
+```go
+type MyStruct struct {
+  // Without `noinit`, DeleteUser would be initialized to the default boolean
+  // value. With `noinit`, if the environment variable is not given, the value
+  // is kept as uninitialized (nil).
+  DeleteUser *bool `env:"DELETE_USER, noinit"`
+}
+```
+
+This also applies to nested fields in a struct:
+
+```go
+type ParentConfig struct {
+  // Without `noinit` tag, `Child` would be set to `&ChildConfig{}` whether
+  // or not `FIELD` is set in the env var.
+  // With `noinit`, `Child` would stay nil if `FIELD` is not set in the env var.
+  Child *ChildConfig `env:",noinit"`
+}
+
+type ChildConfig struct {
+  Field string `env:"FIELD"`
+}
+```
+
+The `noinit` tag is only applicable for pointer fields. Putting the tag on a
+non-struct-pointer will return an error.
 
 
 ## Extension

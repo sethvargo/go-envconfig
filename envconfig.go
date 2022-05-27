@@ -290,7 +290,8 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				// it means nothing was changed in any sub-fields.
 				// With the noinit opt, we skip setting the empty value
 				// to the original struct pointer (aka. keep it nil).
-				if !reflect.DeepEqual(v.Interface(), empty) || !opts.NoInit {
+				// if !reflect.DeepEqual(v.Interface(), empty) || !opts.NoInit {
+				if !reflect.DeepEqual(v.Interface(), empty) {
 					origin.Set(v)
 				}
 			}
@@ -394,7 +395,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 		}
 
 		// Set value.
-		if err := processField(val, ef, opts.Delimiter, opts.Separator); err != nil {
+		if err := processField(val, ef, opts.Delimiter, opts.Separator, opts.NoInit); err != nil {
 			return fmt.Errorf("%s(%q): %w", tf.Name, val, err)
 		}
 	}
@@ -544,7 +545,12 @@ func processAsDecoder(v string, ef reflect.Value) (bool, error) {
 	return imp, err
 }
 
-func processField(v string, ef reflect.Value, delimiter, separator string) error {
+func processField(v string, ef reflect.Value, delimiter, separator string, noInit bool) error {
+	// If the input value is empty and initialization is skipped, do nothing.
+	if v == "" && noInit {
+		return nil
+	}
+
 	// Handle pointers and uninitialized pointers.
 	for ef.Type().Kind() == reflect.Ptr {
 		if ef.IsNil() {
@@ -627,12 +633,12 @@ func processField(v string, ef reflect.Value, delimiter, separator string) error
 			mKey, mVal := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
 
 			k := reflect.New(tf.Key()).Elem()
-			if err := processField(mKey, k, delimiter, separator); err != nil {
+			if err := processField(mKey, k, delimiter, separator, noInit); err != nil {
 				return fmt.Errorf("%s: %w", mKey, err)
 			}
 
 			v := reflect.New(tf.Elem()).Elem()
-			if err := processField(mVal, v, delimiter, separator); err != nil {
+			if err := processField(mVal, v, delimiter, separator, noInit); err != nil {
 				return fmt.Errorf("%s: %w", mVal, err)
 			}
 
@@ -650,7 +656,7 @@ func processField(v string, ef reflect.Value, delimiter, separator string) error
 			s := reflect.MakeSlice(tf, len(vals), len(vals))
 			for i, val := range vals {
 				val = strings.TrimSpace(val)
-				if err := processField(val, s.Index(i), delimiter, separator); err != nil {
+				if err := processField(val, s.Index(i), delimiter, separator, noInit); err != nil {
 					return fmt.Errorf("%s: %w", val, err)
 				}
 			}

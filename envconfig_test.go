@@ -1656,7 +1656,7 @@ func TestProcessWith(t *testing.T) {
 
 		// No init
 		{
-			name: "noinit/no_init_when_sub_fields_set",
+			name: "noinit/no_init_when_sub_fields_unset",
 			input: &struct {
 				Sub *struct {
 					Field string `env:"FIELD"`
@@ -1667,10 +1667,23 @@ func TestProcessWith(t *testing.T) {
 					Field string `env:"FIELD"`
 				} `env:",noinit"`
 			}{
+				// Sub struct ptr shouldn't be initiated because the 'Field' is not set
+				// in the lookuper.
 				Sub: nil,
 			},
-			// 'Sub' struct ptr shouldn't be initiated
-			// because the 'Field' is not set in the lookuper.
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
+			name: "noinit/init_when_sub_sub_fields_unset",
+			input: &struct {
+				Lepton *Lepton `env:",noinit"`
+			}{},
+			exp: &struct {
+				Lepton *Lepton `env:",noinit"`
+			}{
+				// Sub-sub fields should not be initiaized when no value is given.
+				Lepton: nil,
+			},
 			lookuper: MapLookuper(map[string]string{}),
 		},
 		{
@@ -1685,16 +1698,61 @@ func TestProcessWith(t *testing.T) {
 					Field string `env:"FIELD"`
 				} `env:",noinit"`
 			}{
+				// Sub struct ptr should be initiated because the 'Field' is set in the
+				// lookuper.
 				Sub: &struct {
 					Field string `env:"FIELD"`
 				}{
 					Field: "banana",
 				},
 			},
-			// 'Sub' struct ptr should be initiated
-			// because the 'Field' is set in the lookuper.
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "banana",
+			}),
+		},
+		{
+			name: "noinit/init_when_sub_sub_fields_set",
+			input: &struct {
+				Lepton *Lepton `env:",noinit"`
+			}{},
+			exp: &struct {
+				Lepton *Lepton `env:",noinit"`
+			}{
+				// Sub-sub fields should be initiaized when a value is given.
+				Lepton: &Lepton{
+					Quark: &Quark{
+						Value: 5,
+					},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"QUARK_VALUE": "5",
+			}),
+		},
+		{
+			name: "noinit/non_struct_ptr",
+			input: &struct {
+				Field1 *string  `env:"FIELD1, noinit"`
+				Field2 *int     `env:"FIELD2, noinit"`
+				Field3 *float64 `env:"FIELD3, noinit"`
+				Field4 *bool    `env:"FIELD4"`
+			}{},
+			exp: &struct {
+				Field1 *string  `env:"FIELD1, noinit"`
+				Field2 *int     `env:"FIELD2, noinit"`
+				Field3 *float64 `env:"FIELD3, noinit"`
+				Field4 *bool    `env:"FIELD4"`
+			}{
+				// The pointer fields that had a value should initialize, but the unset
+				// values should remain nil, iff they are set to noinit.
+				Field1: func() *string { x := "banana"; return &x }(),
+				Field2: func() *int { x := 5; return &x }(),
+				Field3: nil,
+				Field4: func() *bool { x := false; return &x }(),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD1": "banana",
+				"FIELD2": "5",
 			}),
 		},
 		{

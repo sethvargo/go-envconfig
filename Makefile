@@ -25,6 +25,7 @@ test-acc:
 	@go test \
 		-count=1 \
 		-race \
+		-shuffle=on \
 		-timeout=10m \
 		-vet="${VETTERS}" \
 		./...
