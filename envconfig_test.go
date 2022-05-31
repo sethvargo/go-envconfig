@@ -1654,9 +1654,33 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 
-		// No init
+		// Init (default behavior)
 		{
-			name: "noinit/init_with_nil_structs",
+			name: "init/basic",
+			input: &struct {
+				Field1 string    `env:"FIELD1"`
+				Field2 bool      `env:"FIELD2"`
+				Field3 int64     `env:"FIELD3"`
+				Field4 float64   `env:"FIELD4"`
+				Field5 complex64 `env:"FIELD5"`
+			}{},
+			exp: &struct {
+				Field1 string    `env:"FIELD1"`
+				Field2 bool      `env:"FIELD2"`
+				Field3 int64     `env:"FIELD3"`
+				Field4 float64   `env:"FIELD4"`
+				Field5 complex64 `env:"FIELD5"`
+			}{
+				Field1: "",
+				Field2: false,
+				Field3: 0,
+				Field4: 0,
+				Field5: 0,
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
+			name: "init/structs",
 			input: &struct {
 				Electron *Electron
 			}{},
@@ -1675,6 +1699,8 @@ func TestProcessWith(t *testing.T) {
 			},
 			lookuper: MapLookuper(map[string]string{}),
 		},
+
+		// No init
 		{
 			name: "noinit/no_init_when_sub_fields_unset",
 			input: &struct {

@@ -241,7 +241,9 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 	return processWith(ctx, i, l, false, fns...)
 }
 
-func processWith(ctx context.Context, i interface{}, l Lookuper, pnoinit bool, fns ...MutatorFunc) error {
+// processWith is a helper that captures whether the parent wanted
+// initialization.
+func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bool, fns ...MutatorFunc) error {
 	if l == nil {
 		return ErrLookuperNil
 	}
@@ -290,12 +292,11 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, pnoinit bool, f
 			origin := e.Field(i)
 			if isNilStructPtr {
 				empty := reflect.New(origin.Type().Elem()).Interface()
-				// If a struct (after traversal) equals to the empty value,
-				// it means nothing was changed in any sub-fields.
-				// With the noinit opt, we skip setting the empty value
-				// to the original struct pointer (aka. keep it nil).
-				if !reflect.DeepEqual(v.Interface(), empty) || !(opts.NoInit || pnoinit) {
-				//if !reflect.DeepEqual(v.Interface(), empty) {
+				// If a struct (after traversal) equals to the empty value, it means
+				// nothing was changed in any sub-fields. With the noinit opt, we skip
+				// setting the empty value to the original struct pointer (aka. keep it
+				// nil).
+				if !reflect.DeepEqual(v.Interface(), empty) || (!opts.NoInit && !parentNoInit) {
 					origin.Set(v)
 				}
 			}
