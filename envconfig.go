@@ -238,6 +238,10 @@ func Process(ctx context.Context, i interface{}) error {
 // ProcessWith processes the given interface with the given lookuper. See the
 // package-level documentation for specific examples and behaviors.
 func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorFunc) error {
+	return processWith(ctx, i, l, false, fns...)
+}
+
+func processWith(ctx context.Context, i interface{}, l Lookuper, pnoinit bool, fns ...MutatorFunc) error {
 	if l == nil {
 		return ErrLookuperNil
 	}
@@ -290,8 +294,8 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				// it means nothing was changed in any sub-fields.
 				// With the noinit opt, we skip setting the empty value
 				// to the original struct pointer (aka. keep it nil).
-				// if !reflect.DeepEqual(v.Interface(), empty) || !opts.NoInit {
-				if !reflect.DeepEqual(v.Interface(), empty) {
+				if !reflect.DeepEqual(v.Interface(), empty) || !(opts.NoInit || pnoinit) {
+				//if !reflect.DeepEqual(v.Interface(), empty) {
 					origin.Set(v)
 				}
 			}
@@ -344,7 +348,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 				plu = PrefixLookuper(opts.Prefix, l)
 			}
 
-			if err := ProcessWith(ctx, ef.Interface(), plu, fns...); err != nil {
+			if err := processWith(ctx, ef.Interface(), plu, opts.NoInit, fns...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 

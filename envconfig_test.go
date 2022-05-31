@@ -1656,6 +1656,26 @@ func TestProcessWith(t *testing.T) {
 
 		// No init
 		{
+			name: "noinit/init_with_nil_structs",
+			input: &struct {
+				Electron *Electron
+			}{},
+			exp: &struct {
+				Electron *Electron
+			}{
+				Electron: &Electron{
+					Name: "",
+					Lepton: &Lepton{
+						Name: "",
+						Quark: &Quark{
+							Value: 0,
+						},
+					},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
 			name: "noinit/no_init_when_sub_fields_unset",
 			input: &struct {
 				Sub *struct {
