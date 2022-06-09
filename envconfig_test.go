@@ -30,15 +30,71 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var _ Decoder = (*CustomType)(nil)
+var _ Decoder = (*CustomDecoderType)(nil)
 
-// CustomType is used to test custom decode methods.
-type CustomType struct {
+// CustomDecoderType is used to test custom decoding using Decoder.
+type CustomDecoderType struct {
 	value string
 }
 
-func (c *CustomType) EnvDecode(val string) error {
+func (c *CustomDecoderType) EnvDecode(val string) error {
 	c.value = "CUSTOM-" + val
+	return nil
+}
+
+var (
+	_ encoding.BinaryUnmarshaler = (*CustomStdLibDecodingType)(nil)
+	_ encoding.TextUnmarshaler   = (*CustomStdLibDecodingType)(nil)
+	_ json.Unmarshaler           = (*CustomStdLibDecodingType)(nil)
+	_ gob.GobDecoder             = (*CustomStdLibDecodingType)(nil)
+)
+
+// CustomStdLibDecodingType is used to test custom decoding using the standard
+// library custom unmarshaling interfaces.
+type CustomStdLibDecodingType struct {
+	// used to control implementations
+	implementsTextUnmarshaler   bool
+	implementsBinaryUnmarshaler bool
+	implementsJSONUnmarshaler   bool
+	implementsGobDecoder        bool
+
+	value string
+}
+
+// Equal returns whether the decoded values are equal.
+func (c CustomStdLibDecodingType) Equal(c2 CustomStdLibDecodingType) bool {
+	return c.value == c2.value
+}
+
+func (c *CustomStdLibDecodingType) UnmarshalBinary(data []byte) error {
+	if !c.implementsBinaryUnmarshaler {
+		return errors.New("binary unmarshaler not implemented")
+	}
+	c.value = "BINARY-" + string(data)
+	return nil
+}
+
+func (c *CustomStdLibDecodingType) UnmarshalText(text []byte) error {
+	if !c.implementsTextUnmarshaler {
+		return errors.New("text unmarshaler not implemented")
+	}
+	c.value = "TEXT-" + string(text)
+	return nil
+}
+
+func (c *CustomStdLibDecodingType) UnmarshalJSON(data []byte) error {
+	if !c.implementsJSONUnmarshaler {
+		return errors.New("JSON unmarshaler not implemented")
+	}
+	c.value = "JSON-" + string(data)
+	return nil
+}
+
+func (c *CustomStdLibDecodingType) GobDecode(data []byte) error {
+	if !c.implementsGobDecoder {
+		return errors.New("Gob decoder not implemented")
+	}
+	c.value = "GOB-" + string(data)
 	return nil
 }
 
@@ -1086,22 +1142,112 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "syntax/=key",
 			input: &struct {
-				Field CustomType `env:"FIELD=foo"`
+				Field CustomDecoderType `env:"FIELD=foo"`
 			}{},
 			lookuper: MapLookuper(map[string]string{}),
 			err:      ErrInvalidEnvvarName,
+		},
+
+		// Custom decoding from standard library interfaces
+		{
+			name: "custom_decoder/gob_decoder",
+			input: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					implementsGobDecoder: true,
+				},
+			},
+			exp: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					value: "GOB-foo",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "custom_decoder/binary_unmarshaler",
+			input: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					implementsBinaryUnmarshaler: true,
+					implementsGobDecoder:        true,
+				},
+			},
+			exp: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					value: "BINARY-foo",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "custom_decoder/json_unmarshaler",
+			input: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					implementsBinaryUnmarshaler: true,
+					implementsJSONUnmarshaler:   true,
+					implementsGobDecoder:        true,
+				},
+			},
+			exp: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					implementsTextUnmarshaler: true,
+					value:                     "JSON-foo",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "custom_decoder/text_unmarshaler",
+			input: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					implementsTextUnmarshaler:   true,
+					implementsBinaryUnmarshaler: true,
+					implementsJSONUnmarshaler:   true,
+					implementsGobDecoder:        true,
+				},
+			},
+			exp: &struct {
+				Field CustomStdLibDecodingType `env:"FIELD"`
+			}{
+				Field: CustomStdLibDecodingType{
+					implementsTextUnmarshaler: true,
+					value:                     "TEXT-foo",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
 		},
 
 		// Custom decoder
 		{
 			name: "custom_decoder/struct",
 			input: &struct {
-				Field CustomType `env:"FIELD"`
+				Field CustomDecoderType `env:"FIELD"`
 			}{},
 			exp: &struct {
-				Field CustomType `env:"FIELD"`
+				Field CustomDecoderType `env:"FIELD"`
 			}{
-				Field: CustomType{
+				Field: CustomDecoderType{
 					value: "CUSTOM-foo",
 				},
 			},
@@ -1112,12 +1258,12 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "custom_decoder/pointer",
 			input: &struct {
-				Field *CustomType `env:"FIELD"`
+				Field *CustomDecoderType `env:"FIELD"`
 			}{},
 			exp: &struct {
-				Field *CustomType `env:"FIELD"`
+				Field *CustomDecoderType `env:"FIELD"`
 			}{
-				Field: &CustomType{
+				Field: &CustomDecoderType{
 					value: "CUSTOM-foo",
 				},
 			},
@@ -1128,7 +1274,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "custom_decoder/private",
 			input: &struct {
-				field *CustomType `env:"FIELD"`
+				field *CustomDecoderType `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{}),
 			err:      ErrPrivateField,
@@ -1837,7 +1983,10 @@ func TestProcessWith(t *testing.T) {
 
 			opts := cmp.AllowUnexported(
 				// Custom decoder type
-				CustomType{},
+				CustomDecoderType{},
+
+				// Custom standard library interfaces decoder type
+				CustomStdLibDecodingType{},
 
 				// Custom decoder type that returns an error
 				CustomTypeError{},

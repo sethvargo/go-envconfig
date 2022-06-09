@@ -518,16 +518,9 @@ func processAsDecoder(v string, ef reflect.Value) (bool, error) {
 			return imp, err
 		}
 
-		if tu, ok := iface.(encoding.BinaryUnmarshaler); ok {
+		if tu, ok := iface.(encoding.TextUnmarshaler); ok {
 			imp = true
-			if err = tu.UnmarshalBinary([]byte(v)); err == nil {
-				return imp, nil
-			}
-		}
-
-		if tu, ok := iface.(gob.GobDecoder); ok {
-			imp = true
-			if err = tu.GobDecode([]byte(v)); err == nil {
+			if err = tu.UnmarshalText([]byte(v)); err == nil {
 				return imp, nil
 			}
 		}
@@ -539,9 +532,16 @@ func processAsDecoder(v string, ef reflect.Value) (bool, error) {
 			}
 		}
 
-		if tu, ok := iface.(encoding.TextUnmarshaler); ok {
+		if tu, ok := iface.(encoding.BinaryUnmarshaler); ok {
 			imp = true
-			if err = tu.UnmarshalText([]byte(v)); err == nil {
+			if err = tu.UnmarshalBinary([]byte(v)); err == nil {
+				return imp, nil
+			}
+		}
+
+		if tu, ok := iface.(gob.GobDecoder); ok {
+			imp = true
+			if err = tu.GobDecode([]byte(v)); err == nil {
 				return imp, nil
 			}
 		}
