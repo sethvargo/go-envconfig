@@ -876,6 +876,106 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "foo",
 			}),
 		},
+		{
+			name: "overwrite/does_not_overwrite_no_value",
+			input: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{
+				Field: "inside",
+			},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{
+				Field: "inside",
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "overwrite/env_overwrites_existing",
+			input: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{
+				Field: "inside",
+			},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{
+				Field: "env",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "env",
+			}),
+		},
+		{
+			name: "overwrite/env_overwrites_empty",
+			input: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite"`
+			}{
+				Field: "env",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "env",
+			}),
+		},
+		{
+			name: "overwrite/default_does_not_overwrite_no_value",
+			input: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{
+				Field: "inside",
+			},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{
+				Field: "inside",
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "overwrite/default_env_overwrites_existing",
+			input: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{
+				Field: "inside",
+			},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{
+				Field: "env",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "env",
+			}),
+		},
+		{
+			name: "overwrite/default_env_overwrites_empty",
+			input: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{
+				Field: "env",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "env",
+			}),
+		},
+		{
+			name: "overwrite/default_uses_default_when_unspecified",
+			input: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, overwrite, default=default"`
+			}{
+				Field: "default",
+			},
+			lookuper: MapLookuper(nil),
+		},
 
 		// Required
 		{
@@ -1276,16 +1376,44 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				field *CustomDecoderType `env:"FIELD"`
 			}{},
-			lookuper: MapLookuper(map[string]string{}),
-			err:      ErrPrivateField,
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+			err: ErrPrivateField,
 		},
 		{
 			name: "custom_decoder/error",
 			input: &struct {
 				Field CustomTypeError `env:"FIELD"`
 			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+			errMsg: "broken",
+		},
+		{
+			name: "custom_decoder/called_for_empty_string",
+			input: &struct {
+				Field CustomTypeError `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			errMsg: "broken",
+		},
+		{
+			name: "custom_decoder/not_called_on_unset_envvar",
+			input: &struct {
+				Field CustomTypeError `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field CustomTypeError `env:"FIELD"`
+			}{
+				Field: CustomTypeError{},
+			},
 			lookuper: MapLookuper(map[string]string{}),
-			errMsg:   "broken",
+			// Note: We explicitly want no error here. The custom marshaller should
+			// not have been called, since the environment variables was not defined.
 		},
 
 		// Expand

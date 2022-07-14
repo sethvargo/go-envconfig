@@ -330,18 +330,20 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, err := lookup(key, opts, l)
+			val, found, usedDefault, err := lookup(key, opts, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
-			if ok, err := processAsDecoder(val, ef); ok {
-				if err != nil {
-					return err
-				}
+			if found || usedDefault {
+				if ok, err := processAsDecoder(val, ef); ok {
+					if err != nil {
+						return err
+					}
 
-				setNilStruct(ef)
-				continue
+					setNilStruct(ef)
+					continue
+				}
 			}
 
 			plu := l
@@ -368,23 +370,34 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 			continue
 		}
 
-		// The field already has a non-zero value and overwrite is false, do not overwrite.
+		// The field already has a non-zero value and overwrite is false, do not
+		// overwrite.
 		if !ef.IsZero() && !opts.Overwrite {
 			continue
 		}
 
-		val, err := lookup(key, opts, l)
+		val, found, usedDefault, err := lookup(key, opts, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
 
+		// If the field already has a non-zero value and there was no value directly
+		// specified, do not overwrite the existing field. We only want to overwrite
+		// when the envvar was provided directly.
+		if !ef.IsZero() && !found {
+			continue
+		}
+
 		// Apply any mutators. Mutators are applied after the lookup, but before any
-		// type conversions. They always resolve to a string (or error)
-		for _, fn := range fns {
-			if fn != nil {
-				val, err = fn(ctx, key, val)
-				if err != nil {
-					return fmt.Errorf("%s: %w", tf.Name, err)
+		// type conversions. They always resolve to a string (or error), so we don't
+		// call mutators when the environment variable was not set.
+		if found || usedDefault {
+			for _, fn := range fns {
+				if fn != nil {
+					val, err = fn(ctx, key, val)
+					if err != nil {
+						return fmt.Errorf("%s: %w", tf.Name, err)
+					}
 				}
 			}
 		}
@@ -450,29 +463,32 @@ LOOP:
 	return key, &opts, nil
 }
 
-// lookup looks up the given key using the provided Lookuper and options.
-func lookup(key string, opts *options, l Lookuper) (string, error) {
+// lookup looks up the given key using the provided Lookuper and options. The
+// first boolean parameter indicates whether the value was found in the
+// lookuper. The second boolean parameter indicates whether the default value
+// was used.
+func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
 	if key == "" {
 		// The struct has something like `env:",required"`, which is likely a
 		// mistake. We could try to infer the envvar from the field name, but that
 		// feels too magical.
-		return "", ErrMissingKey
+		return "", false, false, ErrMissingKey
 	}
 
 	if opts.Required && opts.Default != "" {
 		// Having a default value on a required value doesn't make sense.
-		return "", ErrRequiredAndDefault
+		return "", false, false, ErrRequiredAndDefault
 	}
 
 	// Lookup value.
-	val, ok := l.Lookup(key)
-	if !ok {
+	val, found := l.Lookup(key)
+	if !found {
 		if opts.Required {
 			if pl, ok := l.(*prefixLookuper); ok {
 				key = pl.prefix + key
 			}
 
-			return "", fmt.Errorf("%w: %s", ErrMissingRequired, key)
+			return "", false, false, fmt.Errorf("%w: %s", ErrMissingRequired, key)
 		}
 
 		if opts.Default != "" {
@@ -485,10 +501,12 @@ func lookup(key string, opts *options, l Lookuper) (string, error) {
 				}
 				return ""
 			})
+
+			return val, false, true, nil
 		}
 	}
 
-	return val, nil
+	return val, found, false, nil
 }
 
 // processAsDecoder processes the given value as a decoder or custom
