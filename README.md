@@ -72,17 +72,6 @@ type DatabaseConfig struct {
 
 Use the `env` struct tag to define configuration.
 
-### Overwrite
-
-If overwrite is set, the value will be overwritten if there is an
-environment variable match regardless if the value is non-zero.
-
-```go
-type MyStruct struct {
-  Port int `env:"PORT,overwrite"`
-}
-```
-
 ### Required
 
 If a field is required, processing will error if the environment variable is
@@ -146,54 +135,41 @@ type Server2 struct {
 
 It is invalid to specify a prefix on non-struct fields.
 
-### Delimiter
+### Overwrite
 
-When parsing maps and slices, a comma (`,`) is the default element delimiter.
-Define a custom delimiter with `delimiter`:
-
-```go
-type MyStruct struct {
-  MyVar map[string]string `env:"MYVAR,delimiter=;"`
-```
-
-```bash
-export MYVAR="a:1;b:2"
-# map[string]string{"a":"1", "b":"2"}
-```
-
-This is especially helpful when your values include the default delimiter
-character.
-
-```bash
-export MYVAR="a:1,2,3;b:4,5"
-# map[string]string{"a":"1,2,3", "b":"4,5"}
-```
-
-### Separator
-
-When parsing maps, a colon (`:`) is the default key-value separator. Define a
-separator with `separator`:
+If overwrite is set, the value will be overwritten if there is an environment
+variable match regardless if the value is non-zero.
 
 ```go
 type MyStruct struct {
-  MyVar map[string]string `env:"MYVAR,separator=="`
+  Port int `env:"PORT,overwrite"`
 }
 ```
 
-```bash
-export MYVAR="a=b,c=d"
-# map[string]string{"a":"b", "c":"d"}
-```
+The rules for overwrite + default are:
 
-This is especially helpful when your keys or values include the default
-separator character.
+-   If the struct field has the zero value and a default is set:
 
-```bash
-export MYVAR="client=abcd::1/128,backend=abcd::2/128"
-# map[string]string{"client":"abcd::1/128", "backend":"abcd::2/128"}
-```
+    -   If no environment variable is specified, the struct field will be
+        populated with the default value.
+
+    -   If an environment variable is specified, the struct field will be
+        populate with the environment variable value.
+
+-   If the struct field has a non-zero value and a default is set:
+
+    -   If no environment variable is specified, the struct field's existing
+        value will be used (the default is ignored).
+
+    -   If an environment variable is specified, the struct field's existing
+        value will be overwritten with the environment variable value.
+
 
 ## Complex Types
+
+**Note:** Complex types are only decoded or unmarshalled when the environment
+variable is defined or a default is specified. The decoding/unmarshalling
+functions are _not_ invoked when a value is not defined.
 
 ### Durations
 
@@ -237,6 +213,17 @@ type MyStruct struct {
 export MYVAR="a,b,c,d" # []string{"a", "b", "c", "d"}
 ```
 
+Define a custom delimiter with `delimiter`:
+
+```go
+type MyStruct struct {
+  MyVar []string `env:"MYVAR,delimiter=;"`
+```
+
+```bash
+export MYVAR="a;b;c;d" # []string{"a", "b", "c", "d"}
+```
+
 Note that byte slices are special cased and interpreted as strings from the
 environment.
 
@@ -254,6 +241,30 @@ type MyStruct struct {
 export MYVAR="a:b,c:d" # map[string]string{"a":"b", "c":"d"}
 ```
 
+Define a custom delimiter with `delimiter`:
+
+```go
+type MyStruct struct {
+  MyVar map[string]string `env:"MYVAR,delimiter=;"`
+```
+
+```bash
+export MYVAR="a:b;c:d" # map[string]string{"a":"b", "c":"d"}
+```
+
+Define a separator with `separator`:
+
+```go
+type MyStruct struct {
+  MyVar map[string]string `env:"MYVAR,separator=|"`
+}
+```
+
+```bash
+export MYVAR="a|b,c|d" # map[string]string{"a":"b", "c":"d"}
+```
+
+
 ### Structs
 
 Envconfig walks the entire struct, including nested structs, so deeply-nested
@@ -261,12 +272,12 @@ fields are also supported.
 
 If a nested struct is a pointer type, it will automatically be instantianted to
 the non-nil value. To change this behavior, see
-(Initialization)[#Initialization].
+[Initialization](#Initialization).
 
 
 ### Custom
 
-You can also define your own decoder for structs (see below).
+You can also [define your own decoder](#Extension).
 
 
 ## Prefixing
@@ -327,8 +338,8 @@ non-struct-pointer will return an error.
 
 ## Extension
 
-All built-in types are supported except Func and Chan. If you need to define a
-custom decoder, implement the `Decoder` interface:
+All built-in types are supported except `Func` and `Chan`. If you need to define
+a custom decoder, implement the `Decoder` interface:
 
 ```go
 type MyStruct struct {
@@ -339,8 +350,6 @@ func (v *MyStruct) EnvDecode(val string) error {
   v.field = fmt.Sprintf("PREFIX-%s", val)
   return nil
 }
-
-var _ envconfig.Decoder = (*MyStruct)(nil) // interface check
 ```
 
 If you need to modify environment variable values before processing, you can
@@ -394,9 +403,9 @@ major behavioral differences:
 -   Adds support for specifying a custom lookup function (such as a map), which
     is useful for testing.
 
--   Only populates fields if they contain zero or nil values if `overwrite` is unset.
-    This means you can pre-initialize a struct and any pre-populated fields will not
-    be overwritten during processing.
+-   Only populates fields if they contain zero or nil values if `overwrite` is
+    unset. This means you can pre-initialize a struct and any pre-populated
+    fields will not be overwritten during processing.
 
 -   Support for interpolation. The default value for a field can be the value of
     another field.
