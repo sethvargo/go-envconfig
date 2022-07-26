@@ -335,7 +335,11 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
-			if found || usedDefault {
+			// When the env tag is not present on a struct field, the field is considered
+			// unmanaged and initialization should always occur through the decoder.
+			// Managed fields that have the env tag present will only use the decoder
+			// functions when a variable is set or there is a default.
+			if found || usedDefault || tag == "" {
 				if ok, err := processAsDecoder(val, ef); ok {
 					if err != nil {
 						return err

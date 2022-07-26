@@ -99,6 +99,31 @@ func (c *CustomStdLibDecodingType) GobDecode(data []byte) error {
 }
 
 var (
+	_ encoding.TextUnmarshaler   = (*TextUnmarshalerType)(nil)
+)
+
+// TextUnmarshalerType demonstrates a type that contains a struct pointer with
+// no managed env tag. Nested types with no env tag should always defer to the
+// decoder for unmarshalling.
+type TextUnmarshalerType struct {
+	ExportedNameWrapper *NameWrapper
+}
+
+func (t *TextUnmarshalerType) UnmarshalText(text []byte) error {
+	if len(string(text)) > 0 {
+		t.ExportedNameWrapper = &NameWrapper{
+			name: string(text),
+		}
+	}
+
+	return nil
+}
+
+type NameWrapper struct {
+	name string
+}
+
+var (
 	_ Decoder                    = (*CustomTypeError)(nil)
 	_ encoding.BinaryUnmarshaler = (*CustomTypeError)(nil)
 	_ gob.GobDecoder             = (*CustomTypeError)(nil)
@@ -1400,6 +1425,20 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "",
 			}),
 			errMsg: "broken",
+		},
+		{
+			name: "custom_decoder/unmanaged_tag_uses_decoder",
+			input: &struct {
+				Field TextUnmarshalerType
+			}{
+				Field: TextUnmarshalerType{},
+			},
+			exp: &struct {
+				Field TextUnmarshalerType
+			}{
+				Field: TextUnmarshalerType{},
+			},
+			lookuper: MapLookuper(map[string]string{}),
 		},
 		{
 			name: "custom_decoder/not_called_on_unset_envvar",
