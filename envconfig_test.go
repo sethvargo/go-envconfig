@@ -1402,6 +1402,18 @@ func TestProcessWith(t *testing.T) {
 			errMsg: "broken",
 		},
 		{
+			name: "url_value_set",
+			input: &struct {
+				URL *url.URL `env:"URL"`
+			}{},
+			exp: &struct {
+				URL *url.URL `env:"URL"`
+			}{
+				URL: &url.URL{},
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		{
 			name: "custom_decoder/not_called_on_unset_envvar",
 			input: &struct {
 				Field CustomTypeError `env:"FIELD"`
