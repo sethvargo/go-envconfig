@@ -205,7 +205,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			name:     "nil",
 			input:    (*Electron)(nil),
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			err:      ErrNotStruct,
 		},
 
@@ -827,7 +827,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				field: "",
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "private/error",
@@ -1011,7 +1011,7 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field string `env:"FIELD,required"`
 			}{},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			err:      ErrMissingRequired,
 		},
 		{
@@ -1019,7 +1019,7 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field string `env:"FIELD, required"`
 			}{},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			err:      ErrMissingRequired,
 		},
 		{
@@ -1027,7 +1027,7 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field string `env:"FIELD,required,default=foo"`
 			}{},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			err:      ErrRequiredAndDefault,
 		},
 		{
@@ -1035,7 +1035,7 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field string `env:"FIELD, required, default=foo"`
 			}{},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			err:      ErrRequiredAndDefault,
 		},
 
@@ -1050,7 +1050,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: "foo", // uses default
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "default/missing_space",
@@ -1062,7 +1062,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: "foo", // uses default
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "default/empty",
@@ -1175,7 +1175,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: "",
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "default/expand_nil_typed",
@@ -1187,7 +1187,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: false,
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "default/slice",
@@ -1199,7 +1199,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: []string{"foo", "bar", "baz"},
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "default/slice_space",
@@ -1211,7 +1211,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: []string{"foo", "bar", "baz"},
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "default/map",
@@ -1223,7 +1223,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: map[string]string{"foo": "bar", "zip": "zap"},
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "default/map_spaces",
@@ -1235,7 +1235,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: map[string]string{"foo": "bar", "zip": "zap"},
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 
 		// Syntax
@@ -1244,7 +1244,7 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field CustomDecoderType `env:"FIELD=foo"`
 			}{},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			err:      ErrInvalidEnvvarName,
 		},
 
@@ -1411,7 +1411,7 @@ func TestProcessWith(t *testing.T) {
 			}{
 				Field: CustomTypeError{},
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			// Note: We explicitly want no error here. The custom marshaller should
 			// not have been called, since the environment variables was not defined.
 		},
@@ -1793,7 +1793,7 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field string `env:"FIELD,cookies"`
 			}{},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 			err:      ErrUnknownOption,
 		},
 
@@ -1873,7 +1873,7 @@ func TestProcessWith(t *testing.T) {
 				Field string `env:",prefix=FIELD_"`
 			}{},
 			err:      ErrPrefixNotStruct,
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 
 		// Issues - this section is specific to reproducing issues
@@ -1951,7 +1951,7 @@ func TestProcessWith(t *testing.T) {
 				Field4: 0,
 				Field5: 0,
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "init/structs",
@@ -1971,7 +1971,7 @@ func TestProcessWith(t *testing.T) {
 					},
 				},
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 
 		// No init
@@ -1991,7 +1991,7 @@ func TestProcessWith(t *testing.T) {
 				// in the lookuper.
 				Sub: nil,
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "noinit/init_when_sub_sub_fields_unset",
@@ -2004,7 +2004,7 @@ func TestProcessWith(t *testing.T) {
 				// Sub-sub fields should not be initiaized when no value is given.
 				Lepton: nil,
 			},
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "noinit/init_when_sub_fields_set",
@@ -2081,7 +2081,7 @@ func TestProcessWith(t *testing.T) {
 				Field string `env:"FIELD, noinit"`
 			}{},
 			err:      ErrNoInitNotPtr,
-			lookuper: MapLookuper(map[string]string{}),
+			lookuper: MapLookuper(nil),
 		},
 	}
 
