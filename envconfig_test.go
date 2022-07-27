@@ -1876,58 +1876,6 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 
-		// Issues - this section is specific to reproducing issues
-		{
-			// github.com/sethvargo/go-envconfig/issues/13
-			name: "process_fields_after_decoder",
-			input: &struct {
-				Field1 time.Time `env:"FIELD1"`
-				Field2 string    `env:"FIELD2"`
-			}{},
-			exp: &struct {
-				Field1 time.Time `env:"FIELD1"`
-				Field2 string    `env:"FIELD2"`
-			}{
-				Field1: time.Unix(0, 0),
-				Field2: "bar",
-			},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD1": "1970-01-01T00:00:00Z",
-				"FIELD2": "bar",
-			}),
-		},
-		{
-			// https://github.com/sethvargo/go-envconfig/issues/16
-			name: "custom_decoder_nested",
-			input: &struct {
-				Field Base64ByteSlice `env:"FIELD"`
-			}{},
-			exp: &struct {
-				Field Base64ByteSlice `env:"FIELD"`
-			}{
-				Field: Base64ByteSlice{
-					Base64Bytes("foo"),
-					Base64Bytes("bar"),
-				},
-			},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": fmt.Sprintf("%s,%s",
-					base64.StdEncoding.EncodeToString([]byte("foo")),
-					base64.StdEncoding.EncodeToString([]byte("bar")),
-				),
-			}),
-		},
-		{
-			// https://github.com/sethvargo/go-envconfig/issues/28
-			name:   "embedded_prefixes/error-keys",
-			input:  &VCR{},
-			errMsg: "VCR_REMOTE_NAME",
-			lookuper: MapLookuper(map[string]string{
-				"NAME":                   "vcr",
-				"VCR_REMOTE_BUTTON_NAME": "button",
-			}),
-		},
-
 		// Init (default behavior)
 		{
 			name: "init/basic",
@@ -2082,6 +2030,58 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			err:      ErrNoInitNotPtr,
 			lookuper: MapLookuper(nil),
+		},
+
+		// Issues - this section is specific to reproducing issues
+		{
+			// github.com/sethvargo/go-envconfig/issues/13
+			name: "process_fields_after_decoder",
+			input: &struct {
+				Field1 time.Time `env:"FIELD1"`
+				Field2 string    `env:"FIELD2"`
+			}{},
+			exp: &struct {
+				Field1 time.Time `env:"FIELD1"`
+				Field2 string    `env:"FIELD2"`
+			}{
+				Field1: time.Unix(0, 0),
+				Field2: "bar",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD1": "1970-01-01T00:00:00Z",
+				"FIELD2": "bar",
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/16
+			name: "custom_decoder_nested",
+			input: &struct {
+				Field Base64ByteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field Base64ByteSlice `env:"FIELD"`
+			}{
+				Field: Base64ByteSlice{
+					Base64Bytes("foo"),
+					Base64Bytes("bar"),
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": fmt.Sprintf("%s,%s",
+					base64.StdEncoding.EncodeToString([]byte("foo")),
+					base64.StdEncoding.EncodeToString([]byte("bar")),
+				),
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/28
+			name:   "embedded_prefixes/error-keys",
+			input:  &VCR{},
+			errMsg: "VCR_REMOTE_NAME",
+			lookuper: MapLookuper(map[string]string{
+				"NAME":                   "vcr",
+				"VCR_REMOTE_BUTTON_NAME": "button",
+			}),
 		},
 	}
 
