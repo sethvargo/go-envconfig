@@ -1942,7 +1942,7 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 		{
-			name: "noinit/init_when_sub_sub_fields_unset",
+			name: "noinit/no_init_when_sub_sub_fields_unset",
 			input: &struct {
 				Lepton *Lepton `env:",noinit"`
 			}{},
@@ -1951,6 +1951,35 @@ func TestProcessWith(t *testing.T) {
 			}{
 				// Sub-sub fields should not be initiaized when no value is given.
 				Lepton: nil,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "noinit/no_init_from_parent",
+			input: &struct {
+				Electron *Electron `env:"FIELD,noinit"`
+			}{},
+			exp: &struct {
+				Electron *Electron `env:"FIELD,noinit"`
+			}{
+				Electron: nil,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "noinit/no_init_when_decoder",
+			input: &struct {
+				Parent *struct {
+					Field url.URL
+				} `env:",noinit"`
+			}{},
+			exp: &struct {
+				Parent *struct {
+					Field url.URL
+				} `env:",noinit"`
+			}{
+				// Parent should be nil.
+				Parent: nil,
 			},
 			lookuper: MapLookuper(nil),
 		},

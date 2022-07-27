@@ -286,17 +286,18 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 		if opts.NoInit && ef.Kind() != reflect.Ptr {
 			return fmt.Errorf("%s: %w", tf.Name, ErrNoInitNotPtr)
 		}
+		shouldNotInit := opts.NoInit || parentNoInit
 
 		isNilStructPtr := false
 		setNilStruct := func(v reflect.Value) {
 			origin := e.Field(i)
 			if isNilStructPtr {
 				empty := reflect.New(origin.Type().Elem()).Interface()
+
 				// If a struct (after traversal) equals to the empty value, it means
 				// nothing was changed in any sub-fields. With the noinit opt, we skip
-				// setting the empty value to the original struct pointer (aka. keep it
-				// nil).
-				if !reflect.DeepEqual(v.Interface(), empty) || (!opts.NoInit && !parentNoInit) {
+				// setting the empty value to the original struct pointer (keep it nil).
+				if !reflect.DeepEqual(v.Interface(), empty) || !shouldNotInit {
 					origin.Set(v)
 				}
 			}
@@ -314,7 +315,6 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 				isNilStructPtr = true
 				// Use an empty struct of the type so we can traverse.
 				ef = reflect.New(ef.Type().Elem()).Elem()
-
 			} else {
 				ef = ef.Elem()
 			}
@@ -351,7 +351,7 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 				plu = PrefixLookuper(opts.Prefix, l)
 			}
 
-			if err := processWith(ctx, ef.Interface(), plu, opts.NoInit, fns...); err != nil {
+			if err := processWith(ctx, ef.Interface(), plu, shouldNotInit, fns...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
