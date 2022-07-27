@@ -330,20 +330,18 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, found, usedDefault, err := lookup(key, opts, l)
+			val, _, _, err := lookup(key, opts, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
-			if found || usedDefault {
-				if ok, err := processAsDecoder(val, ef); ok {
-					if err != nil {
-						return err
-					}
-
-					setNilStruct(ef)
-					continue
+			if ok, err := processAsDecoder(val, ef); ok {
+				if err != nil {
+					return err
 				}
+
+				setNilStruct(ef)
+				continue
 			}
 
 			plu := l

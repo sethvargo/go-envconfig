@@ -42,6 +42,31 @@ func (c *CustomDecoderType) EnvDecode(val string) error {
 	return nil
 }
 
+// Level mirrors Zap's level marshalling to reproduce an issue for tests.
+type Level int8
+
+const (
+	DebugLevel Level = 0
+	InfoLevel  Level = 5
+	ErrorLevel Level = 100
+)
+
+func (l *Level) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case "debug":
+		*l = DebugLevel
+		return nil
+	case "info", "": // default
+		*l = InfoLevel
+		return nil
+	case "error":
+		*l = ErrorLevel
+		return nil
+	default:
+		return fmt.Errorf("unknown level %s", string(text))
+	}
+}
+
 var (
 	_ encoding.BinaryUnmarshaler = (*CustomStdLibDecodingType)(nil)
 	_ encoding.TextUnmarshaler   = (*CustomStdLibDecodingType)(nil)
@@ -1401,20 +1426,6 @@ func TestProcessWith(t *testing.T) {
 			}),
 			errMsg: "broken",
 		},
-		{
-			name: "custom_decoder/not_called_on_unset_envvar",
-			input: &struct {
-				Field CustomTypeError `env:"FIELD"`
-			}{},
-			exp: &struct {
-				Field CustomTypeError `env:"FIELD"`
-			}{
-				Field: CustomTypeError{},
-			},
-			lookuper: MapLookuper(nil),
-			// Note: We explicitly want no error here. The custom marshaller should
-			// not have been called, since the environment variables was not defined.
-		},
 
 		// Expand
 		{
@@ -2110,6 +2121,110 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{
 				"NAME":                   "vcr",
 				"VCR_REMOTE_BUTTON_NAME": "button",
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/61
+			name: "custom_decoder_overwrite_uses_default",
+			input: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{},
+			exp: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{
+				Level: ErrorLevel,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/61
+			name: "custom_decoder_overwrite_unset",
+			input: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{},
+			exp: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{
+				Level: DebugLevel,
+			},
+			lookuper: MapLookuper(map[string]string{
+				"LEVEL": "debug",
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/61
+			name: "custom_decoder_overwrite_existing_value",
+			input: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{
+				Level: InfoLevel,
+			},
+			exp: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{
+				Level: InfoLevel,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/61
+			name: "custom_decoder_overwrite_existing_value_envvar",
+			input: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{
+				Level: InfoLevel,
+			},
+			exp: &struct {
+				Level Level `env:"LEVEL,overwrite,default=error"`
+			}{
+				Level: DebugLevel,
+			},
+			lookuper: MapLookuper(map[string]string{
+				"LEVEL": "debug",
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/64
+			name: "custom_decoder_uses_decoder_no_env",
+			input: &struct {
+				URL *url.URL
+			}{},
+			exp: &struct {
+				URL *url.URL
+			}{
+				URL: &url.URL{},
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/64
+			name: "custom_decoder_uses_decoder_env_no_value",
+			input: &struct {
+				URL *url.URL `env:"URL"`
+			}{},
+			exp: &struct {
+				URL *url.URL `env:"URL"`
+			}{
+				URL: &url.URL{},
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/64
+			name: "custom_decoder_uses_decoder_env_with_value",
+			input: &struct {
+				URL *url.URL `env:"URL"`
+			}{},
+			exp: &struct {
+				URL *url.URL `env:"URL"`
+			}{
+				URL: &url.URL{
+					Scheme: "https",
+					Host:   "foo.bar",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"URL": "https://foo.bar",
 			}),
 		},
 	}
