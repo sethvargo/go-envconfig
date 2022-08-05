@@ -214,6 +214,18 @@ type Button struct {
 
 type Base64ByteSlice []Base64Bytes
 
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
+}
+
 func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
@@ -1445,35 +1457,49 @@ func TestProcessWith(t *testing.T) {
 
 		// Pointer pointers
 		{
-			name: "string_pointer",
+			name: "pointer_string",
 			input: &struct {
 				Field *string `env:"FIELD"`
 			}{},
 			exp: &struct {
 				Field *string `env:"FIELD"`
 			}{
-				Field: func() *string { s := "foo"; return &s }(),
+				Field: stringPtr("foo"),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
 			}),
 		},
 		{
-			name: "string_pointer_pointer",
+			name: "pointer_pointer_string",
 			input: &struct {
 				Field **string `env:"FIELD"`
 			}{},
 			exp: &struct {
 				Field **string `env:"FIELD"`
 			}{
-				Field: func() **string { s := "foo"; ptr := &s; return &ptr }(),
+				Field: func() **string { ptr := stringPtr("foo"); return &ptr }(),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
 			}),
 		},
 		{
-			name: "map_pointer",
+			name: "pointer_int",
+			input: &struct {
+				Field *int `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *int `env:"FIELD"`
+			}{
+				Field: intPtr(5),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "5",
+			}),
+		},
+		{
+			name: "pointer_map",
 			input: &struct {
 				Field *map[string]string `env:"FIELD"`
 			}{},
@@ -1490,7 +1516,7 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name: "slice_pointer",
+			name: "pointer_slice",
 			input: &struct {
 				Field *[]string `env:"FIELD"`
 			}{},
@@ -1507,7 +1533,21 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name: "bool_pointer",
+			name: "pointer_bool",
+			input: &struct {
+				Field *bool `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *bool `env:"FIELD"`
+			}{
+				Field: boolPtr(true),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "true",
+			}),
+		},
+		{
+			name: "pointer_bool_noinit",
 			input: &struct {
 				Field *bool `env:"FIELD,noinit"`
 			}{},
@@ -1515,6 +1555,118 @@ func TestProcessWith(t *testing.T) {
 				Field *bool `env:"FIELD,noinit"`
 			}{
 				Field: nil,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "pointer_bool_default_field_set_env_unset",
+			input: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			exp: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "pointer_bool_default_field_set_env_set",
+			input: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			exp: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "true",
+			}),
+		},
+		{
+			name: "pointer_bool_default_field_unset_env_set",
+			input: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{},
+			exp: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "false",
+			}),
+		},
+		{
+			name: "pointer_bool_default_field_unset_env_unset",
+			input: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{},
+			exp: &struct {
+				Field *bool `env:"FIELD,default=true"`
+			}{
+				Field: boolPtr(true),
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "pointer_bool_default_overwrite_field_set_env_unset",
+			input: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			exp: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "pointer_bool_default_overwrite_field_set_env_set",
+			input: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			exp: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{
+				Field: boolPtr(true),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "true",
+			}),
+		},
+		{
+			name: "pointer_bool_default_overwrite_field_unset_env_set",
+			input: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{},
+			exp: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{
+				Field: boolPtr(false),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "false",
+			}),
+		},
+		{
+			name: "pointer_bool_default_overwrite_field_unset_env_unset",
+			input: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{},
+			exp: &struct {
+				Field *bool `env:"FIELD,overwrite,default=true"`
+			}{
+				Field: boolPtr(true),
 			},
 			lookuper: MapLookuper(nil),
 		},
