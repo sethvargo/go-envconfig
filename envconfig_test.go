@@ -1506,6 +1506,18 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "foo",
 			}),
 		},
+		{
+			name: "bool_pointer",
+			input: &struct {
+				Field *bool `env:"FIELD,noinit"`
+			}{},
+			exp: &struct {
+				Field *bool `env:"FIELD,noinit"`
+			}{
+				Field: nil,
+			},
+			lookuper: MapLookuper(nil),
+		},
 
 		// Marshallers
 		{
