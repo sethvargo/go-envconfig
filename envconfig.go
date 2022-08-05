@@ -304,6 +304,7 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 		}
 
 		// Initialize pointer structs.
+		pointerWasSet := false
 		for ef.Kind() == reflect.Ptr {
 			if ef.IsNil() {
 				if ef.Type().Elem().Kind() != reflect.Struct {
@@ -316,6 +317,7 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 				// Use an empty struct of the type so we can traverse.
 				ef = reflect.New(ef.Type().Elem()).Elem()
 			} else {
+				pointerWasSet = true
 				ef = ef.Elem()
 			}
 		}
@@ -370,7 +372,7 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 
 		// The field already has a non-zero value and overwrite is false, do not
 		// overwrite.
-		if !ef.IsZero() && !opts.Overwrite {
+		if (pointerWasSet || !ef.IsZero()) && !opts.Overwrite {
 			continue
 		}
 
@@ -382,7 +384,7 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 		// If the field already has a non-zero value and there was no value directly
 		// specified, do not overwrite the existing field. We only want to overwrite
 		// when the envvar was provided directly.
-		if !ef.IsZero() && !found {
+		if (pointerWasSet || !ef.IsZero()) && !found {
 			continue
 		}
 
