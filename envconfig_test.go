@@ -2436,3 +2436,76 @@ func TestProcessWith(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateEnvName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   string
+		exp  bool
+	}{
+		{
+			name: "empty",
+			in:   "",
+			exp:  false,
+		},
+		{
+			name: "space",
+			in:   " ",
+			exp:  false,
+		},
+		{
+			name: "digit_start",
+			in:   "1FOO",
+			exp:  false,
+		},
+		{
+			name: "emoji_start",
+			in:   "🚀",
+			exp:  false,
+		},
+		{
+			name: "lowercase_start",
+			in:   "f",
+			exp:  true,
+		},
+		{
+			name: "lowercase",
+			in:   "foo",
+			exp:  true,
+		},
+		{
+			name: "uppercase_start",
+			in:   "F",
+			exp:  true,
+		},
+		{
+			name: "uppercase",
+			in:   "FOO",
+			exp:  true,
+		},
+		{
+			name: "emoji_middle",
+			in:   "FOO🚀",
+			exp:  false,
+		},
+		{
+			name: "space_middle",
+			in:   "FOO BAR",
+			exp:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got, want := validateEnvName(tc.in), tc.exp; got != want {
+				t.Errorf("expected %q to be %t (got %t)", tc.in, want, got)
+			}
+		})
+	}
+}

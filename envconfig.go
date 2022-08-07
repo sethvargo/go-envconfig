@@ -73,7 +73,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -93,8 +92,6 @@ const (
 	defaultDelimiter = ","
 	defaultSeparator = ":"
 )
-
-var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
 
 // Error is a custom error type for errors returned by envconfig.
 type Error string
@@ -425,7 +422,7 @@ func keyAndOpts(tag string) (string, *options, error) {
 	parts := strings.Split(tag, ",")
 	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
 
-	if key != "" && !envvarNameRe.MatchString(key) {
+	if key != "" && !validateEnvName(key) {
 		return "", nil, fmt.Errorf("%q: %w ", key, ErrInvalidEnvvarName)
 	}
 
@@ -686,4 +683,35 @@ func processField(v string, ef reflect.Value, delimiter, separator string, noIni
 	}
 
 	return nil
+}
+
+// validateEnvName validates the given string conforms to being a valid
+// environment variable.
+//
+// Per IEEE Std 1003.1-2001 environment variables consist solely of uppercase
+// letters, digits, and _, and do not begin with a digit.
+func validateEnvName(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	for i, r := range s {
+		if (i == 0 && !isLetter(r)) || (!isLetter(r) && !isNumber(r) && r != '_') {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isLetter returns true if the given rune is a letter between a-z,A-Z. This is
+// different than unicode.IsLetter which includes all L character cases.
+func isLetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+// isNumber returns true if the given run is a number between 0-9. This is
+// different than unicode.IsNumber in that it only allows 0-9.
+func isNumber(r rune) bool {
+	return r >= '0' && r <= '9'
 }
