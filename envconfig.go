@@ -14,55 +14,54 @@
 
 // Package envconfig populates struct fields based on environment variable
 // values (or anything that responds to "Lookup"). Structs declare their
-// environment dependencies using the `env` tag with the key being the name of
+// environment dependencies using the "env" tag with the key being the name of
 // the environment variable, case sensitive.
 //
-//     type MyStruct struct {
-//         A string `env:"A"` // resolves A to $A
-//         B string `env:"B,required"` // resolves B to $B, errors if $B is unset
-//         C string `env:"C,default=foo"` // resolves C to $C, defaults to "foo"
+//	type MyStruct struct {
+//	  A string `env:"A"` // resolves A to $A
+//	  B string `env:"B,required"` // resolves B to $B, errors if $B is unset
+//	  C string `env:"C,default=foo"` // resolves C to $C, defaults to "foo"
 //
-//         D string `env:"D,required,default=foo"` // error, cannot be required and default
-//         E string `env:""` // error, must specify key
-//     }
+//	  D string `env:"D,required,default=foo"` // error, cannot be required and default
+//	  E string `env:""` // error, must specify key
+//	}
 //
 // All built-in types are supported except Func and Chan. If you need to define
 // a custom decoder, implement Decoder:
 //
-//     type MyStruct struct {
-//         field string
-//     }
+//	type MyStruct struct {
+//	  field string
+//	}
 //
-//     func (v *MyStruct) EnvDecode(val string) error {
-//         v.field = fmt.Sprintf("PREFIX-%s", val)
-//         return nil
-//     }
+//	func (v *MyStruct) EnvDecode(val string) error {
+//	  v.field = fmt.Sprintf("PREFIX-%s", val)
+//	  return nil
+//	}
 //
 // In the environment, slices are specified as comma-separated values:
 //
-//     export MYVAR="a,b,c,d" // []string{"a", "b", "c", "d"}
+//	export MYVAR="a,b,c,d" // []string{"a", "b", "c", "d"}
 //
 // In the environment, maps are specified as comma-separated key:value pairs:
 //
-//     export MYVAR="a:b,c:d" // map[string]string{"a":"b", "c":"d"}
+//	export MYVAR="a:b,c:d" // map[string]string{"a":"b", "c":"d"}
 //
 // If you need to modify environment variable values before processing, you can
 // specify a custom mutator:
 //
-//     type Config struct {
-//         Password `env:"PASSWORD_SECRET"`
-//     }
+//	type Config struct {
+//	  Password `env:"PASSWORD_SECRET"`
+//	}
 //
-//     func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
-//         if strings.HasPrefix(value, "secret://") {
-//             return secretmanager.Resolve(ctx, value) // example
-//         }
-//         return value, nil
-//     }
+//	func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
+//	  if strings.HasPrefix(value, "secret://") {
+//	    return secretmanager.Resolve(ctx, value) // example
+//	  }
+//	  return value, nil
+//	}
 //
-//     var config Config
-//     ProcessWith(&config, OsLookuper(), resolveSecretFunc)
-//
+//	var config Config
+//	ProcessWith(&config, OsLookuper(), resolveSecretFunc)
 package envconfig
 
 import (
@@ -138,7 +137,7 @@ func (o *osLookuper) Lookup(key string) (string, bool) {
 	return os.LookupEnv(key)
 }
 
-// OsLookuper returns a lookuper that uses the environment (os.LookupEnv) to
+// OsLookuper returns a lookuper that uses the environment ([os.LookupEnv]) to
 // resolve values.
 func OsLookuper() Lookuper {
 	return new(osLookuper)
@@ -203,12 +202,11 @@ func MultiLookuper(lookupers ...Lookuper) Lookuper {
 // Decoder is an interface that custom types/fields can implement to control how
 // decoding takes place. For example:
 //
-//     type MyType string
+//	type MyType string
 //
-//     func (mt MyType) EnvDecode(val string) error {
-//         return "CUSTOM-"+val
-//     }
-//
+//	func (mt MyType) EnvDecode(val string) error {
+//	    return "CUSTOM-"+val
+//	}
 type Decoder interface {
 	EnvDecode(val string) error
 }
@@ -229,7 +227,7 @@ type options struct {
 	Required  bool
 }
 
-// Process processes the struct using the environment. See ProcessWith for a
+// Process processes the struct using the environment. See [ProcessWith] for a
 // more customizable version.
 func Process(ctx context.Context, i interface{}) error {
 	return ProcessWith(ctx, i, OsLookuper())
