@@ -14,55 +14,54 @@
 
 // Package envconfig populates struct fields based on environment variable
 // values (or anything that responds to "Lookup"). Structs declare their
-// environment dependencies using the `env` tag with the key being the name of
+// environment dependencies using the "env" tag with the key being the name of
 // the environment variable, case sensitive.
 //
-//     type MyStruct struct {
-//         A string `env:"A"` // resolves A to $A
-//         B string `env:"B,required"` // resolves B to $B, errors if $B is unset
-//         C string `env:"C,default=foo"` // resolves C to $C, defaults to "foo"
+//	type MyStruct struct {
+//	  A string `env:"A"` // resolves A to $A
+//	  B string `env:"B,required"` // resolves B to $B, errors if $B is unset
+//	  C string `env:"C,default=foo"` // resolves C to $C, defaults to "foo"
 //
-//         D string `env:"D,required,default=foo"` // error, cannot be required and default
-//         E string `env:""` // error, must specify key
-//     }
+//	  D string `env:"D,required,default=foo"` // error, cannot be required and default
+//	  E string `env:""` // error, must specify key
+//	}
 //
 // All built-in types are supported except Func and Chan. If you need to define
 // a custom decoder, implement Decoder:
 //
-//     type MyStruct struct {
-//         field string
-//     }
+//	type MyStruct struct {
+//	  field string
+//	}
 //
-//     func (v *MyStruct) EnvDecode(val string) error {
-//         v.field = fmt.Sprintf("PREFIX-%s", val)
-//         return nil
-//     }
+//	func (v *MyStruct) EnvDecode(val string) error {
+//	  v.field = fmt.Sprintf("PREFIX-%s", val)
+//	  return nil
+//	}
 //
 // In the environment, slices are specified as comma-separated values:
 //
-//     export MYVAR="a,b,c,d" // []string{"a", "b", "c", "d"}
+//	export MYVAR="a,b,c,d" // []string{"a", "b", "c", "d"}
 //
 // In the environment, maps are specified as comma-separated key:value pairs:
 //
-//     export MYVAR="a:b,c:d" // map[string]string{"a":"b", "c":"d"}
+//	export MYVAR="a:b,c:d" // map[string]string{"a":"b", "c":"d"}
 //
 // If you need to modify environment variable values before processing, you can
 // specify a custom mutator:
 //
-//     type Config struct {
-//         Password `env:"PASSWORD_SECRET"`
-//     }
+//	type Config struct {
+//	  Password `env:"PASSWORD_SECRET"`
+//	}
 //
-//     func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
-//         if strings.HasPrefix(value, "secret://") {
-//             return secretmanager.Resolve(ctx, value) // example
-//         }
-//         return value, nil
-//     }
+//	func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
+//	  if strings.HasPrefix(value, "secret://") {
+//	    return secretmanager.Resolve(ctx, value) // example
+//	  }
+//	  return value, nil
+//	}
 //
-//     var config Config
-//     ProcessWith(&config, OsLookuper(), resolveSecretFunc)
-//
+//	var config Config
+//	ProcessWith(&config, OsLookuper(), resolveSecretFunc)
 package envconfig
 
 import (
@@ -74,7 +73,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -94,8 +92,6 @@ const (
 	defaultDelimiter = ","
 	defaultSeparator = ":"
 )
-
-var envvarNameRe = regexp.MustCompile(`\A[a-zA-Z_][a-zA-Z0-9_]*\z`)
 
 // Error is a custom error type for errors returned by envconfig.
 type Error string
@@ -138,7 +134,7 @@ func (o *osLookuper) Lookup(key string) (string, bool) {
 	return os.LookupEnv(key)
 }
 
-// OsLookuper returns a lookuper that uses the environment (os.LookupEnv) to
+// OsLookuper returns a lookuper that uses the environment ([os.LookupEnv]) to
 // resolve values.
 func OsLookuper() Lookuper {
 	return new(osLookuper)
@@ -203,12 +199,11 @@ func MultiLookuper(lookupers ...Lookuper) Lookuper {
 // Decoder is an interface that custom types/fields can implement to control how
 // decoding takes place. For example:
 //
-//     type MyType string
+//	type MyType string
 //
-//     func (mt MyType) EnvDecode(val string) error {
-//         return "CUSTOM-"+val
-//     }
-//
+//	func (mt MyType) EnvDecode(val string) error {
+//	    return "CUSTOM-"+val
+//	}
 type Decoder interface {
 	EnvDecode(val string) error
 }
@@ -229,7 +224,7 @@ type options struct {
 	Required  bool
 }
 
-// Process processes the struct using the environment. See ProcessWith for a
+// Process processes the struct using the environment. See [ProcessWith] for a
 // more customizable version.
 func Process(ctx context.Context, i interface{}) error {
 	return ProcessWith(ctx, i, OsLookuper())
@@ -427,7 +422,7 @@ func keyAndOpts(tag string) (string, *options, error) {
 	parts := strings.Split(tag, ",")
 	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
 
-	if key != "" && !envvarNameRe.MatchString(key) {
+	if key != "" && !validateEnvName(key) {
 		return "", nil, fmt.Errorf("%q: %w ", key, ErrInvalidEnvvarName)
 	}
 
@@ -688,4 +683,35 @@ func processField(v string, ef reflect.Value, delimiter, separator string, noIni
 	}
 
 	return nil
+}
+
+// validateEnvName validates the given string conforms to being a valid
+// environment variable.
+//
+// Per IEEE Std 1003.1-2001 environment variables consist solely of uppercase
+// letters, digits, and _, and do not begin with a digit.
+func validateEnvName(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	for i, r := range s {
+		if (i == 0 && !isLetter(r)) || (!isLetter(r) && !isNumber(r) && r != '_') {
+			return false
+		}
+	}
+
+	return true
+}
+
+// isLetter returns true if the given rune is a letter between a-z,A-Z. This is
+// different than unicode.IsLetter which includes all L character cases.
+func isLetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+// isNumber returns true if the given run is a number between 0-9. This is
+// different than unicode.IsNumber in that it only allows 0-9.
+func isNumber(r rune) bool {
+	return r >= '0' && r <= '9'
 }
