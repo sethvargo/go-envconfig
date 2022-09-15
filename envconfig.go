@@ -236,6 +236,28 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 	return processWith(ctx, i, l, false, fns...)
 }
 
+// ExtractDefaults is a helper that returns a fully-populated struct with the
+// default values resolved. This is helpful when you want to return a constant
+// "default" configuration that is not affected by the user's environment.
+//
+//	type Config struct {
+//	  Port string `env:"PORT,default=8080"`
+//	}
+//
+//	func DefaultConfig() *Config {
+//	  var cfg Config
+//	  if err := envconfig.ExtractDefaults(); err != nil {
+//	    panic("failed to extract default config: %s" + err.Error())
+//	  }
+//	  return &cfg
+//	}
+//
+// This is effectively the same as calling [ProcessWith] with an empty
+// [MapLookuper].
+func ExtractDefaults(ctx context.Context, i interface{}, fns ...MutatorFunc) error {
+	return processWith(ctx, i, MapLookuper(nil), false, fns...)
+}
+
 // processWith is a helper that captures whether the parent wanted
 // initialization.
 func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bool, fns ...MutatorFunc) error {
