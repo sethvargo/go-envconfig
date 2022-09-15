@@ -2509,3 +2509,78 @@ func TestValidateEnvName(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractDefaults(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		input  interface{}
+		exp    interface{}
+		err    error
+		errMsg string
+	}{
+		{
+			name:  "nil",
+			input: (*Electron)(nil),
+			err:   ErrNotStruct,
+		},
+		{
+			name: "extracts",
+			input: &struct {
+				Field1 string `env:"FIELD, default=8080"`
+				Field2 string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field1 string `env:"FIELD, default=8080"`
+				Field2 string `env:"FIELD"`
+			}{
+				Field1: "8080",
+				Field2: "",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			if err := ExtractDefaults(ctx, tc.input); err != nil {
+				if tc.err == nil && tc.errMsg == "" {
+					t.Fatal(err)
+				}
+
+				if tc.err != nil && !errors.Is(err, tc.err) {
+					t.Fatalf("expected \n%+v\n to be \n%+v\n", err, tc.err)
+				}
+
+				if got, want := err.Error(), tc.errMsg; want != "" && !strings.Contains(got, want) {
+					t.Fatalf("expected \n%+v\n to match \n%+v\n", got, want)
+				}
+
+				// There's an error, but it passed all our tests, so return now.
+				return
+			}
+
+			opts := cmp.AllowUnexported(
+				// Custom decoder type
+				CustomDecoderType{},
+
+				// Custom standard library interfaces decoder type
+				CustomStdLibDecodingType{},
+
+				// Custom decoder type that returns an error
+				CustomTypeError{},
+
+				// Anonymous struct with private fields
+				struct{ field string }{},
+			)
+			if diff := cmp.Diff(tc.exp, tc.input, opts); diff != "" {
+				t.Fatalf("mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
