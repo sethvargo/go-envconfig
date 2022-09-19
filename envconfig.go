@@ -246,7 +246,7 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 //
 //	func DefaultConfig() *Config {
 //	  var cfg Config
-//	  if err := envconfig.ExtractDefaults(); err != nil {
+//	  if err := envconfig.ExtractDefaults(ctx, &cfg); err != nil {
 //	    panic("failed to extract default config: %s" + err.Error())
 //	  }
 //	  return &cfg
