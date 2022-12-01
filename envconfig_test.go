@@ -2391,6 +2391,36 @@ func TestProcessWith(t *testing.T) {
 				"URL": "https://foo.bar",
 			}),
 		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/79
+			name: "space_delimiter",
+			input: &struct {
+				Field map[string]string `env:"FIELD,delimiter= "`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD,delimiter= "`
+			}{
+				Field: map[string]string{"foo": "1,2", "bar": "3,4", "zip": "zap:zoo,3"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo:1,2 bar:3,4 zip:zap:zoo,3",
+			}),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/79
+			name: "space_separator",
+			input: &struct {
+				Field map[string]string `env:"FIELD,separator= "`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD,separator= "`
+			}{
+				Field: map[string]string{"foo": "bar", "zip:zap": "zoo:zil"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo bar,zip:zap zoo:zil",
+			}),
+		},
 	}
 
 	for _, tc := range cases {

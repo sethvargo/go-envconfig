@@ -76,6 +76,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const (
@@ -452,7 +453,7 @@ func keyAndOpts(tag string) (string, *options, error) {
 
 LOOP:
 	for i, o := range tagOpts {
-		o = strings.TrimSpace(o)
+		o = strings.TrimLeftFunc(o, unicode.IsSpace)
 		switch {
 		case o == optOverwrite:
 			opts.Overwrite = true
