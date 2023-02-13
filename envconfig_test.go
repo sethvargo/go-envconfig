@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -2226,6 +2227,42 @@ func TestProcessWith(t *testing.T) {
 				"FIELD1": "banana",
 				"FIELD2": "5",
 			}),
+		},
+		{
+			name: "noinit/map",
+			input: &struct {
+				Field map[string]string `env:"FIELD, noinit"`
+			}{},
+			exp: &struct {
+				Field map[string]string `env:"FIELD, noinit"`
+			}{
+				Field: nil,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "noinit/slice",
+			input: &struct {
+				Field []string `env:"FIELD, noinit"`
+			}{},
+			exp: &struct {
+				Field []string `env:"FIELD, noinit"`
+			}{
+				Field: nil,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "noinit/unsafe_pointer",
+			input: &struct {
+				Field unsafe.Pointer `env:"FIELD, noinit"`
+			}{},
+			exp: &struct {
+				Field unsafe.Pointer `env:"FIELD, noinit"`
+			}{
+				Field: nil,
+			},
+			lookuper: MapLookuper(nil),
 		},
 		{
 			name: "noinit/error_not_ptr",
