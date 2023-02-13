@@ -305,8 +305,8 @@ export APP_MYVAR="foo"
 
 ## Initialization
 
-By default, all pointer fields are initialized (allocated) so they are not
-`nil`. To disable this behavior, use the tag the field as `noinit`:
+By default, all pointers, slices, and maps are initialized (allocated) so they
+are not `nil`. To disable this behavior, use the tag the field as `noinit`:
 
 ```go
 type MyStruct struct {
@@ -332,8 +332,8 @@ type ChildConfig struct {
 }
 ```
 
-The `noinit` tag is only applicable for pointer fields. Putting the tag on a
-non-struct-pointer will return an error.
+The `noinit` tag is only applicable for pointer, slice, and map fields. Putting
+the tag on a different type will return an error.
 
 
 ## Extension

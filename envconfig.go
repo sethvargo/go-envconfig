@@ -301,7 +301,11 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 		}
 
 		// NoInit is only permitted on pointers.
-		if opts.NoInit && ef.Kind() != reflect.Ptr {
+		if opts.NoInit &&
+			ef.Kind() != reflect.Ptr &&
+			ef.Kind() != reflect.Slice &&
+			ef.Kind() != reflect.Map &&
+			ef.Kind() != reflect.UnsafePointer {
 			return fmt.Errorf("%s: %w", tf.Name, ErrNoInitNotPtr)
 		}
 		shouldNotInit := opts.NoInit || parentNoInit
