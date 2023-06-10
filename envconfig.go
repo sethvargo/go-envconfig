@@ -515,9 +515,9 @@ func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
 
 		if opts.Default != "" {
 			// Expand the default value. This allows for a default value that maps to
-			// a different variable.
+			// a different environment variable.
 			val = os.Expand(opts.Default, func(i string) string {
-				s, ok := l.Lookup(i)
+				s, ok := OsLookuper().Lookup(i)
 				if ok {
 					return s
 				}
