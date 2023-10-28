@@ -517,6 +517,15 @@ func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
 			// Expand the default value. This allows for a default value that maps to
 			// a different variable.
 			val = os.Expand(opts.Default, func(i string) string {
+				// special case for the name of the env var itself, including
+				// its prefix
+				if i == "_" {
+					if pl, ok := l.(*prefixLookuper); ok {
+						return pl.prefix + key
+					}
+					return key
+				}
+
 				s, ok := l.Lookup(i)
 				if ok {
 					return s

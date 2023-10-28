@@ -109,6 +109,18 @@ type MyStruct struct {
 
 The value for `Port` will default to the value of `DEFAULT_PORT`.
 
+You can set the value to the original name of the environment variable as
+follows:
+
+```go
+type MyStruct struct {
+  Field string `env:"ENV_VAR,default=$_`
+}
+```
+
+The value of `Field` will default to `"ENV_VAR"`. If there is a prefix, then the
+value will also have the prefix.
+
 It is invalid to have a field as both `required` and `default`.
 
 ### Prefix

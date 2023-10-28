@@ -1228,6 +1228,64 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 		{
+			name: "default/expand_env_var_name",
+			input: &struct {
+				Field string `env:"FIELD,default=$_"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$_"`
+			}{
+				Field: "FIELD",
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "default/expand_underscore_longest_run",
+			input: &struct {
+				Field string `env:"FIELD,default=$_FOO"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$_FOO"`
+			}{
+				Field: "VALUE",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"_FOO": "VALUE",
+			}),
+		},
+		{
+			name: "default/expand_explicit_env_var_name_with_trailer",
+			input: &struct {
+				Field string `env:"FIELD,default=${_}FOO"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=${_}FOO"`
+			}{
+				Field: "FIELDFOO",
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "default/expand_env_var_name_with_prefix",
+			input: &struct {
+				Struct struct {
+					Field string `env:"FIELD,default=$_"`
+				} `env:",prefix=PREFIX_"`
+			}{},
+			exp: &struct {
+				Struct struct {
+					Field string `env:"FIELD,default=$_"`
+				} `env:",prefix=PREFIX_"`
+			}{
+				Struct: struct {
+					Field string `env:"FIELD,default=$_"`
+				}{
+					Field: "PREFIX_FIELD",
+				},
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
 			name: "default/slice",
 			input: &struct {
 				Field []string `env:"FIELD,default=foo,bar,baz"`
