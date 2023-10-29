@@ -1240,6 +1240,20 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 		{
+			name: "default/expand_override_env_var_name",
+			input: &struct {
+				Field string `env:"FIELD,default=$_"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$_"`
+			}{
+				Field: "VALUE",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"_": "VALUE",
+			}),
+		},
+		{
 			name: "default/expand_underscore_longest_run",
 			input: &struct {
 				Field string `env:"FIELD,default=$_FOO"`

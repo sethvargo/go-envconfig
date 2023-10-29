@@ -119,7 +119,9 @@ type MyStruct struct {
 ```
 
 The value of `Field` will default to `"ENV_VAR"`. If there is a prefix, then the
-value will also have the prefix.
+value will also have the prefix. If a value for `_` would be returned upon
+lookup (e.g., there is an environment variable named `_`), that value is given
+precedence.
 
 It is invalid to have a field as both `required` and `default`.
 
