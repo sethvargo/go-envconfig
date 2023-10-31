@@ -337,6 +337,8 @@ the tag on a different type will return an error.
 
 ## Extension
 
+### Decoders
+
 All built-in types are supported except `Func` and `Chan`. If you need to define
 a custom decoder, implement the `Decoder` interface:
 
@@ -351,6 +353,8 @@ func (v *MyStruct) EnvDecode(val string) error {
 }
 ```
 
+### Mutators
+
 If you need to modify environment variable values before processing, you can
 specify a custom `Mutator`:
 
@@ -359,16 +363,91 @@ type Config struct {
   Password `env:"PASSWORD"`
 }
 
-func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
+func resolveSecretFunc(ctx context.Context, originalKey, resolvedKey, originalValue, resolvedValue string) (newValue string, stop bool, err error) {
   if strings.HasPrefix(value, "secret://") {
-    return secretmanager.Resolve(ctx, value) // example
+    v, err := secretmanager.Resolve(ctx, value) // example
+    if err != nil {
+      return resolvedValue, true, fmt.Errorf("failed to access secret: %w", err)
+    }
+    return v, false, nil
   }
-  return value, nil
+  return resolvedValue, false, nil
 }
 
 var config Config
 envconfig.ProcessWith(ctx, &config, envconfig.OsLookuper(), resolveSecretFunc)
 ```
+
+Mutator functions are like middleware, and they have access to the initial and
+current state of the stack. Mutators only run when a value has been provided in
+the environment. They execute _before_ any complex type processing, so all
+inputs and outputs are strings. The parameters (in order) are:
+
+-   `originalKey` is the unmodified environment variable name as it was defined
+    on the struct.
+
+-   `resolvedKey` is the fully-resolved environment variable name, which may
+    include prefixes or modifications from processing. When there are no
+    modifications, this will be equivalent to `originalKey`.
+
+-   `originalValue` is the unmodified environment variable's value before any
+    mutations were run.
+
+-   `currentValue` is the currently-resolved value, which may have been modified
+    by previous mutators and may be modified by subsequent mutators in the
+    stack.
+
+The function returns (in order):
+
+-   The new value to use in both future mutations and final processing.
+
+-   A boolean which indicates whether future mutations in the stack should be
+    applied.
+
+-   Any errors that occurred.
+
+> [!TIP]
+>
+> Users coming from the v0 series can wrap their mutator functions with
+> `LegacyMutatorFunc` for an easier transition to this new syntax.
+
+Consider the following example to illustrate the difference between
+`originalKey` and `resolvedKey`:
+
+```go
+type Config struct {
+  Password `env:"PASSWORD"`
+}
+
+var config Config
+lookuper := envconfig.PrefixLookuper("REDIS_", envconfig.MapLookuper(map[string]string{
+  "PASSWORD": "original",
+}))
+mutators := []envconfig.MutatorFunc{mutatorFunc1, mutatorFunc2, mutatorFunc3}
+envconfig.ProcessWith(ctx, &config, lookuper, mutators...)
+
+func mutatorFunc1(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (string, bool, error) {
+  // originalKey is "PASSWORD"
+  // resolvedKey is "REDIS_PASSWORD"
+  // originalValue is "original"
+  // currentValue is "original"
+  return currentValue+"-modified", false, nil
+}
+
+func mutatorFunc2(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (string, bool, error) {
+  // originalKey is "PASSWORD"
+  // resolvedKey is "REDIS_PASSWORD"
+  // originalValue is "original"
+  // currentValue is "original-modified"
+  return currentValue, true, nil
+}
+
+func mutatorFunc3(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (string, bool, error) {
+  // This mutator will never run because mutatorFunc2 stopped the chain.
+  return "...", false, nil
+}
+```
+
 
 ## Testing
 
