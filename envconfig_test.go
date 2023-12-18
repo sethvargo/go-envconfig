@@ -162,6 +162,12 @@ var valueMutatorFunc MutatorFunc = func(ctx context.Context, oKey, rKey, oVal, r
 	return fmt.Sprintf("MUTATED_%s", rVal), false, nil
 }
 
+type CustomMutator struct{}
+
+func (m *CustomMutator) EnvMutate(ctx context.Context, oKey, rKey, oVal, rVal string) (string, bool, error) {
+	return fmt.Sprintf("CUSTOM_MUTATED_%s", rVal), false, nil
+}
+
 // Electron > Lepton > Quark
 type Electron struct {
 	Name   string `env:"ELECTRON_NAME"`
@@ -235,7 +241,7 @@ func TestProcessWith(t *testing.T) {
 		input    any
 		exp      any
 		lookuper Lookuper
-		mutators []MutatorFunc
+		mutators []Mutator
 		err      error
 		errMsg   string
 	}{
@@ -1835,7 +1841,24 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "value",
 			}),
-			mutators: []MutatorFunc{valueMutatorFunc},
+			mutators: []Mutator{valueMutatorFunc},
+		},
+		{
+			name: "mutate/custom",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "CUSTOM_MUTATED_value",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "value",
+			}),
+			mutators: []Mutator{
+				&CustomMutator{},
+			},
 		},
 		{
 			name: "mutate/stops",
@@ -1850,13 +1873,13 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "",
 			}),
-			mutators: []MutatorFunc{
-				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+			mutators: []Mutator{
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
 					return "value-1", true, nil
-				},
-				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+				}),
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
 					return "value-2", true, nil
-				},
+				}),
 			},
 		},
 		{
@@ -1872,10 +1895,10 @@ func TestProcessWith(t *testing.T) {
 			lookuper: PrefixLookuper("KEY_", MapLookuper(map[string]string{
 				"KEY_FIELD": "",
 			})),
-			mutators: []MutatorFunc{
-				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+			mutators: []Mutator{
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
 					return fmt.Sprintf("oKey:%s, rKey:%s", oKey, rKey), false, nil
-				},
+				}),
 			},
 		},
 		{
@@ -1891,13 +1914,13 @@ func TestProcessWith(t *testing.T) {
 			lookuper: PrefixLookuper("KEY_", MapLookuper(map[string]string{
 				"KEY_FIELD": "old-value",
 			})),
-			mutators: []MutatorFunc{
-				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+			mutators: []Mutator{
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
 					return "new-value", false, nil
-				},
-				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+				}),
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
 					return fmt.Sprintf("oVal:%s, cVal:%s", oVal, cVal), false, nil
-				},
+				}),
 			},
 		},
 		{
@@ -1911,13 +1934,13 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "",
 			}),
-			mutators: []MutatorFunc{
-				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+			mutators: []Mutator{
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
 					return "", false, fmt.Errorf("error 1")
-				},
-				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+				}),
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
 					return "", false, fmt.Errorf("error 2")
-				},
+				}),
 			},
 			errMsg: "error 1",
 		},
@@ -1976,7 +1999,7 @@ func TestProcessWith(t *testing.T) {
 				"BREAD_NAME":    "rye",
 				"MEAT_TYPE":     "pep",
 			}),
-			mutators: []MutatorFunc{valueMutatorFunc},
+			mutators: []Mutator{valueMutatorFunc},
 		},
 
 		// Overwriting

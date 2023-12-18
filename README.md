@@ -375,10 +375,31 @@ var config Config
 envconfig.ProcessWith(ctx, &config, envconfig.OsLookuper(), resolveSecretFunc)
 ```
 
-Mutator functions are like middleware, and they have access to the initial and
-current state of the stack. Mutators only run when a value has been provided in
-the environment. They execute _before_ any complex type processing, so all
-inputs and outputs are strings. The parameters (in order) are:
+Mutators are like middleware, and they have access to the initial and current
+state of the stack. Mutators only run when a value has been provided in the
+environment. They execute _before_ any complex type processing, so all inputs
+and outputs are strings. To create a mutator, implement `EnvMutate` or use
+`MutatorFunc`:
+
+```go
+type MyMutator struct {}
+
+func (m *MyMutator) EnvMutate(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
+  // ...
+}
+
+//
+// OR
+//
+
+envconfig.MutatorFunc(func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
+  // ...
+})
+```
+
+The parameters (in order) are:
+
+-   `context` is the context provided to `Process`.
 
 -   `originalKey` is the unmodified environment variable name as it was defined
     on the struct.
@@ -420,7 +441,7 @@ var config Config
 lookuper := envconfig.PrefixLookuper("REDIS_", envconfig.MapLookuper(map[string]string{
   "PASSWORD": "original",
 }))
-mutators := []envconfig.MutatorFunc{mutatorFunc1, mutatorFunc2, mutatorFunc3}
+mutators := []envconfig.Mutators{mutatorFunc1, mutatorFunc2, mutatorFunc3}
 envconfig.ProcessWith(ctx, &config, lookuper, mutators...)
 
 func mutatorFunc1(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (string, bool, error) {
