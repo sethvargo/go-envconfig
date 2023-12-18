@@ -221,21 +221,10 @@ type Button struct {
 
 type Base64ByteSlice []Base64Bytes
 
-func boolPtr(b bool) *bool {
-	return &b
-}
-
-func stringPtr(s string) *string {
-	return &s
-}
-
-func intPtr(i int) *int {
-	return &i
-}
-
 func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
+	// TODO(sethvargo): switch to accepting [Options]
 	cases := []struct {
 		name     string
 		input    any
@@ -488,7 +477,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *time.Duration `env:"FIELD"`
 			}{
-				Field: func() *time.Duration { d := 10 * time.Second; return &d }(),
+				Field: ptrTo(10 * time.Second),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "10s",
@@ -1471,7 +1460,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *string `env:"FIELD"`
 			}{
-				Field: stringPtr("foo"),
+				Field: ptrTo("foo"),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
@@ -1485,7 +1474,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field **string `env:"FIELD"`
 			}{
-				Field: func() **string { ptr := stringPtr("foo"); return &ptr }(),
+				Field: ptrTo(ptrTo("foo")),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
@@ -1499,7 +1488,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *int `env:"FIELD"`
 			}{
-				Field: intPtr(5),
+				Field: ptrTo(int(5)),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "5",
@@ -1513,10 +1502,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *map[string]string `env:"FIELD"`
 			}{
-				Field: func() *map[string]string {
-					m := map[string]string{"foo": "bar"}
-					return &m
-				}(),
+				Field: ptrTo(map[string]string{"foo": "bar"}),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo:bar",
@@ -1530,10 +1516,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *[]string `env:"FIELD"`
 			}{
-				Field: func() *[]string {
-					s := []string{"foo"}
-					return &s
-				}(),
+				Field: ptrTo([]string{"foo"}),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
@@ -1547,7 +1530,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *bool `env:"FIELD"`
 			}{
-				Field: boolPtr(true),
+				Field: ptrTo(true),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "true",
@@ -1570,12 +1553,12 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			exp: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			lookuper: MapLookuper(nil),
 		},
@@ -1584,12 +1567,12 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			exp: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "true",
@@ -1603,7 +1586,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "false",
@@ -1617,7 +1600,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
-				Field: boolPtr(true),
+				Field: ptrTo(true),
 			},
 			lookuper: MapLookuper(nil),
 		},
@@ -1626,12 +1609,12 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			exp: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			lookuper: MapLookuper(nil),
 		},
@@ -1640,12 +1623,12 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			exp: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
-				Field: boolPtr(true),
+				Field: ptrTo(true),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "true",
@@ -1659,7 +1642,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
-				Field: boolPtr(false),
+				Field: ptrTo(false),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "false",
@@ -1673,7 +1656,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
-				Field: boolPtr(true),
+				Field: ptrTo(true),
 			},
 			lookuper: MapLookuper(nil),
 		},
@@ -1740,10 +1723,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *time.Time `env:"FIELD"`
 			}{
-				Field: func() *time.Time {
-					t := time.Unix(0, 0)
-					return &t
-				}(),
+				Field: ptrTo(time.Unix(0, 0)),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": func() string {
@@ -1777,10 +1757,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *time.Time `env:"FIELD"`
 			}{
-				Field: func() *time.Time {
-					t := time.Unix(0, 0)
-					return &t
-				}(),
+				Field: ptrTo(time.Unix(0, 0)),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": func() string {
@@ -1814,10 +1791,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Field *time.Time `env:"FIELD"`
 			}{
-				Field: func() *time.Time {
-					t := time.Unix(0, 0)
-					return &t
-				}(),
+				Field: ptrTo(time.Unix(0, 0)),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": func() string {
@@ -2034,12 +2008,12 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field *string `env:"FIELD"`
 			}{
-				Field: func() *string { s := "bar"; return &s }(),
+				Field: ptrTo("bar"),
 			},
 			exp: &struct {
 				Field *string `env:"FIELD"`
 			}{
-				Field: func() *string { s := "bar"; return &s }(),
+				Field: ptrTo("bar"),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
@@ -2050,20 +2024,12 @@ func TestProcessWith(t *testing.T) {
 			input: &struct {
 				Field **string `env:"FIELD"`
 			}{
-				Field: func() **string {
-					s := "bar"
-					ptr := &s
-					return &ptr
-				}(),
+				Field: ptrTo(ptrTo("bar")),
 			},
 			exp: &struct {
 				Field **string `env:"FIELD"`
 			}{
-				Field: func() **string {
-					s := "bar"
-					ptr := &s
-					return &ptr
-				}(),
+				Field: ptrTo(ptrTo("bar")),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo",
@@ -2325,10 +2291,10 @@ func TestProcessWith(t *testing.T) {
 			}{
 				// The pointer fields that had a value should initialize, but the unset
 				// values should remain nil, iff they are set to noinit.
-				Field1: func() *string { x := "banana"; return &x }(),
-				Field2: func() *int { x := 5; return &x }(),
+				Field1: ptrTo("banana"),
+				Field2: ptrTo(int(5)),
 				Field3: nil,
-				Field4: func() *bool { x := false; return &x }(),
+				Field4: ptrTo(false),
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD1": "banana",
@@ -2682,4 +2648,8 @@ func TestValidateEnvName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func ptrTo[T any](i T) *T {
+	return &i
 }
