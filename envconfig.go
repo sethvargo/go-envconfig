@@ -267,13 +267,13 @@ type options struct {
 
 // Process processes the struct using the environment. See [ProcessWith] for a
 // more customizable version.
-func Process(ctx context.Context, i interface{}) error {
+func Process(ctx context.Context, i any) error {
 	return ProcessWith(ctx, i, OsLookuper())
 }
 
 // ProcessWith processes the given interface with the given lookuper. See the
 // package-level documentation for specific examples and behaviors.
-func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorFunc) error {
+func ProcessWith(ctx context.Context, i any, l Lookuper, fns ...MutatorFunc) error {
 	return processWith(ctx, i, l, false, fns...)
 }
 
@@ -295,13 +295,13 @@ func ProcessWith(ctx context.Context, i interface{}, l Lookuper, fns ...MutatorF
 //
 // This is effectively the same as calling [ProcessWith] with an empty
 // [MapLookuper].
-func ExtractDefaults(ctx context.Context, i interface{}, fns ...MutatorFunc) error {
+func ExtractDefaults(ctx context.Context, i any, fns ...MutatorFunc) error {
 	return processWith(ctx, i, MapLookuper(nil), false, fns...)
 }
 
 // processWith is a helper that captures whether the parent wanted
 // initialization.
-func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bool, fns ...MutatorFunc) error {
+func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, fns ...MutatorFunc) error {
 	if l == nil {
 		return ErrLookuperNil
 	}

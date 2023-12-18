@@ -232,8 +232,8 @@ func TestProcessWith(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		input    interface{}
-		exp      interface{}
+		input    any
+		exp      any
 		lookuper Lookuper
 		mutators []MutatorFunc
 		err      error
@@ -2666,8 +2666,8 @@ func TestExtractDefaults(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		input  interface{}
-		exp    interface{}
+		input  any
+		exp    any
 		err    error
 		errMsg string
 	}{
