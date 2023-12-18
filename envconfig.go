@@ -219,41 +219,6 @@ type Decoder interface {
 	EnvDecode(val string) error
 }
 
-// MutatorFunc is a function that mutates a given value before it is passed
-// along for processing. This is useful if you want to mutate the environment
-// variable value before it's converted to the proper type.
-//
-//   - `originalKey` is the unmodified environment variable name as it was defined
-//     on the struct.
-//
-//   - `resolvedKey` is the fully-resolved environment variable name, which may
-//     include prefixes or modifications from processing. When there are
-//     no modifications, this will be equivalent to `originalKey`.
-//
-//   - `originalValue` is the unmodified environment variable's value before any
-//     mutations were run.
-//
-//   - `currentValue` is the currently-resolved value, which may have been
-//     modified by previous mutators and may be modified in the future by
-//     subsequent mutators in the stack.
-//
-// It returns the new value, a boolean which indicates whether future mutations
-// in the stack should be applied, and any errors that occurred.
-type MutatorFunc func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error)
-
-// LegacyMutatorFunc is a helper that eases the transition from the previous
-// MutatorFunc signature. It wraps the previous-style mutator function and
-// returns a new one. Since the former mutator function had less data, this is
-// inherently lossy.
-//
-// DEPRECATED: Change type signatures to [MutatorFunc] instead.
-func LegacyMutatorFunc(fn func(ctx context.Context, key, value string) (string, error)) MutatorFunc {
-	return func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
-		v, err := fn(ctx, originalKey, currentValue)
-		return v, true, err
-	}
-}
-
 // options are internal options for decoding.
 type options struct {
 	Default   string
@@ -267,14 +232,14 @@ type options struct {
 
 // Process processes the struct using the environment. See [ProcessWith] for a
 // more customizable version.
-func Process(ctx context.Context, i any) error {
-	return ProcessWith(ctx, i, OsLookuper())
+func Process(ctx context.Context, i any, mus ...Mutator) error {
+	return ProcessWith(ctx, i, OsLookuper(), mus...)
 }
 
 // ProcessWith processes the given interface with the given lookuper. See the
 // package-level documentation for specific examples and behaviors.
-func ProcessWith(ctx context.Context, i any, l Lookuper, fns ...MutatorFunc) error {
-	return processWith(ctx, i, l, false, fns...)
+func ProcessWith(ctx context.Context, i any, l Lookuper, mus ...Mutator) error {
+	return processWith(ctx, i, l, false, mus...)
 }
 
 // ExtractDefaults is a helper that returns a fully-populated struct with the
@@ -295,13 +260,13 @@ func ProcessWith(ctx context.Context, i any, l Lookuper, fns ...MutatorFunc) err
 //
 // This is effectively the same as calling [ProcessWith] with an empty
 // [MapLookuper].
-func ExtractDefaults(ctx context.Context, i any, fns ...MutatorFunc) error {
-	return processWith(ctx, i, MapLookuper(nil), false, fns...)
+func ExtractDefaults(ctx context.Context, i any, mus ...Mutator) error {
+	return processWith(ctx, i, MapLookuper(nil), false, mus...)
 }
 
 // processWith is a helper that captures whether the parent wanted
 // initialization.
-func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, fns ...MutatorFunc) error {
+func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus ...Mutator) error {
 	if l == nil {
 		return ErrLookuperNil
 	}
@@ -413,7 +378,7 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, fns 
 				plu = PrefixLookuper(opts.Prefix, l)
 			}
 
-			if err := processWith(ctx, ef.Interface(), plu, shouldNotInit, fns...); err != nil {
+			if err := processWith(ctx, ef.Interface(), plu, shouldNotInit, mus...); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
@@ -462,12 +427,12 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, fns 
 			originalValue := val
 			stop := false
 
-			for _, fn := range fns {
-				if fn == nil {
+			for _, mu := range mus {
+				if mu == nil {
 					continue
 				}
 
-				val, stop, err = fn(ctx, originalKey, resolvedKey, originalValue, val)
+				val, stop, err = mu.EnvMutate(ctx, originalKey, resolvedKey, originalValue, val)
 				if err != nil {
 					return fmt.Errorf("%s: %w", tf.Name, err)
 				}
