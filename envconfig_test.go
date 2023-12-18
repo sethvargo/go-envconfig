@@ -158,8 +158,8 @@ func (c *CustomTypeError) UnmarshalText(text []byte) error {
 }
 
 // valueMutatorFunc is used for testing mutators.
-var valueMutatorFunc MutatorFunc = func(ctx context.Context, k, v string) (string, error) {
-	return fmt.Sprintf("MUTATED_%s", v), nil
+var valueMutatorFunc MutatorFunc = func(ctx context.Context, oKey, rKey, oVal, rVal string) (string, bool, error) {
+	return fmt.Sprintf("MUTATED_%s", rVal), false, nil
 }
 
 // Electron > Lepton > Quark
@@ -1836,6 +1836,90 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "value",
 			}),
 			mutators: []MutatorFunc{valueMutatorFunc},
+		},
+		{
+			name: "mutate/stops",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "value-1",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			mutators: []MutatorFunc{
+				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return "value-1", true, nil
+				},
+				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return "value-2", true, nil
+				},
+			},
+		},
+		{
+			name: "mutate/original_and_resolved_keys",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "oKey:FIELD, rKey:KEY_FIELD",
+			},
+			lookuper: PrefixLookuper("KEY_", MapLookuper(map[string]string{
+				"KEY_FIELD": "",
+			})),
+			mutators: []MutatorFunc{
+				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return fmt.Sprintf("oKey:%s, rKey:%s", oKey, rKey), false, nil
+				},
+			},
+		},
+		{
+			name: "mutate/original_and_current_values",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "oVal:old-value, cVal:new-value",
+			},
+			lookuper: PrefixLookuper("KEY_", MapLookuper(map[string]string{
+				"KEY_FIELD": "old-value",
+			})),
+			mutators: []MutatorFunc{
+				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return "new-value", false, nil
+				},
+				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return fmt.Sprintf("oVal:%s, cVal:%s", oVal, cVal), false, nil
+				},
+			},
+		},
+		{
+			name: "mutate/halts_error",
+			input: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			mutators: []MutatorFunc{
+				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return "", false, fmt.Errorf("error 1")
+				},
+				func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return "", false, fmt.Errorf("error 2")
+				},
+			},
+			errMsg: "error 1",
 		},
 
 		// Nesting

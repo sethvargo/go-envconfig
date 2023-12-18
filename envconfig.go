@@ -188,13 +188,23 @@ type prefixLookuper struct {
 }
 
 func (p *prefixLookuper) Lookup(key string) (string, bool) {
-	return p.l.Lookup(p.prefix + key)
+	return p.l.Lookup(p.Key(key))
+}
+
+func (p *prefixLookuper) Key(key string) string {
+	return p.prefix + key
 }
 
 // MultiLookuper wraps a collection of lookupers. It does not combine them, and
 // lookups appear in the order in which they are provided to the initializer.
 func MultiLookuper(lookupers ...Lookuper) Lookuper {
 	return &multiLookuper{ls: lookupers}
+}
+
+// KeyedLookuper is an extension to the [Lookuper] interface that returns the
+// underlying key (used by the [PrefixLookuper] or custom implementations).
+type KeyedLookuper interface {
+	Key(key string) string
 }
 
 // Decoder is an interface that custom types/fields can implement to control how
@@ -212,7 +222,37 @@ type Decoder interface {
 // MutatorFunc is a function that mutates a given value before it is passed
 // along for processing. This is useful if you want to mutate the environment
 // variable value before it's converted to the proper type.
-type MutatorFunc func(ctx context.Context, k, v string) (string, error)
+//
+//   - `originalKey` is the unmodified environment variable name as it was defined
+//     on the struct.
+//
+//   - `resolvedKey` is the fully-resolved environment variable name, which may
+//     include prefixes or modifications from processing. When there are
+//     no modifications, this will be equivalent to `originalKey`.
+//
+//   - `originalValue` is the unmodified environment variable's value before any
+//     mutations were run.
+//
+//   - `currentValue` is the currently-resolved value, which may have been
+//     modified by previous mutators and may be modified in the future by
+//     subsequent mutators in the stack.
+//
+// It returns the new value, a boolean which indicates whether future mutations
+// in the stack should be applied, and any errors that occurred.
+type MutatorFunc func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error)
+
+// LegacyMutatorFunc is a helper that eases the transition from the previous
+// MutatorFunc signature. It wraps the previous-style mutator function and
+// returns a new one. Since the former mutator function had less data, this is
+// inherently lossy.
+//
+// DEPRECATED: Change type signatures to [MutatorFunc] instead.
+func LegacyMutatorFunc(fn func(ctx context.Context, key, value string) (string, error)) MutatorFunc {
+	return func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
+		v, err := fn(ctx, originalKey, currentValue)
+		return v, true, err
+	}
+}
 
 // options are internal options for decoding.
 type options struct {
@@ -414,12 +454,25 @@ func processWith(ctx context.Context, i interface{}, l Lookuper, parentNoInit bo
 		// type conversions. They always resolve to a string (or error), so we don't
 		// call mutators when the environment variable was not set.
 		if found || usedDefault {
+			originalKey := key
+			resolvedKey := originalKey
+			if keyer, ok := l.(KeyedLookuper); ok {
+				resolvedKey = keyer.Key(resolvedKey)
+			}
+			originalValue := val
+			stop := false
+
 			for _, fn := range fns {
-				if fn != nil {
-					val, err = fn(ctx, key, val)
-					if err != nil {
-						return fmt.Errorf("%s: %w", tf.Name, err)
-					}
+				if fn == nil {
+					continue
+				}
+
+				val, stop, err = fn(ctx, originalKey, resolvedKey, originalValue, val)
+				if err != nil {
+					return fmt.Errorf("%s: %w", tf.Name, err)
+				}
+				if stop {
+					break
 				}
 			}
 		}
@@ -506,8 +559,8 @@ func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
 	val, found := l.Lookup(key)
 	if !found {
 		if opts.Required {
-			if pl, ok := l.(*prefixLookuper); ok {
-				key = pl.prefix + key
+			if keyer, ok := l.(KeyedLookuper); ok {
+				key = keyer.Key(key)
 			}
 
 			return "", false, false, fmt.Errorf("%w: %s", ErrMissingRequired, key)
