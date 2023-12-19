@@ -89,9 +89,6 @@ const (
 	optPrefix    = "prefix="
 	optRequired  = "required"
 	optSeparator = "separator="
-
-	defaultDelimiter = ","
-	defaultSeparator = ":"
 )
 
 // Error is a custom error type for errors returned by envconfig.
@@ -230,21 +227,76 @@ type options struct {
 	Required  bool
 }
 
+// Config represent inputs to the envconfig decoding.
+type Config struct {
+	// Target is the destination structure to decode. This value is required.
+	Target any
+
+	// Lookuper is the lookuper implementation to use. If not provided, it
+	// defaults to the OS Lookuper.
+	Lookuper Lookuper
+
+	// DefaultDelimiter is the default value to use for the delimiter in maps and
+	// slices. This can be overridden on a per-field basis, which takes
+	// precedence. The default value is ",".
+	DefaultDelimiter string
+
+	// DefaultSeparator is the default value to use for the separator in maps.
+	// This can be overridden on a per-field basis, which takes precedence. The
+	// default value is ":".
+	DefaultSeparator string
+
+	// DefaultNoInit is the default value for skipping initialization of
+	// unprovided fields. The default value is false (deeply initialize all
+	// fields and nested structs).
+	DefaultNoInit bool
+
+	// DefaultOverwrite is the default value for overwriting an existing value set
+	// on the struct before processing. The default value is false.
+	DefaultOverwrite bool
+
+	// DefaultRequired is the default value for marking a field as required. The
+	// default value is false.
+	DefaultRequired bool
+
+	// Mutators is an optiona list of mutators to apply to lookups.
+	Mutators []Mutator
+}
+
 // Process processes the struct using the environment. See [ProcessWith] for a
 // more customizable version.
 func Process(ctx context.Context, i any, mus ...Mutator) error {
-	return ProcessWith(ctx, i, OsLookuper(), mus...)
+	return ProcessWith(ctx, &Config{
+		Target:   i,
+		Mutators: mus,
+	})
 }
 
 // ProcessWith processes the given interface with the given lookuper. See the
 // package-level documentation for specific examples and behaviors.
-func ProcessWith(ctx context.Context, i any, l Lookuper, mus ...Mutator) error {
-	return processWith(ctx, i, l, false, mus...)
+func ProcessWith(ctx context.Context, c *Config) error {
+	if c == nil {
+		c = new(Config)
+	}
+
+	// Deep copy the slice and remove any nil functions.
+	var mus []Mutator
+	for _, m := range c.Mutators {
+		if m != nil {
+			mus = append(mus, m)
+		}
+	}
+	c.Mutators = mus
+
+	return processWith(ctx, c)
 }
 
 // processWith is a helper that captures whether the parent wanted
 // initialization.
-func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus ...Mutator) error {
+func processWith(ctx context.Context, c *Config) error {
+	i := c.Target
+
+	l := c.Lookuper
 	if l == nil {
 		return ErrLookuperNil
 	}
@@ -260,6 +312,23 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 	}
 
 	t := e.Type()
+
+	structDelimiter := c.DefaultDelimiter
+	if structDelimiter == "" {
+		structDelimiter = ","
+	}
+
+	structNoInit := c.DefaultNoInit
+
+	structSeparator := c.DefaultSeparator
+	if structSeparator == "" {
+		structSeparator = ":"
+	}
+
+	structOverwrite := c.DefaultOverwrite
+	structRequired := c.DefaultRequired
+
+	mutators := c.Mutators
 
 	for i := 0; i < t.NumField(); i++ {
 		ef := e.Field(i)
@@ -291,7 +360,20 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 			ef.Kind() != reflect.UnsafePointer {
 			return fmt.Errorf("%s: %w", tf.Name, ErrNoInitNotPtr)
 		}
-		shouldNotInit := opts.NoInit || parentNoInit
+
+		// Compute defaults from local tags.
+		delimiter := structDelimiter
+		if v := opts.Delimiter; v != "" {
+			delimiter = v
+		}
+		separator := structSeparator
+		if v := opts.Separator; v != "" {
+			separator = v
+		}
+
+		noInit := structNoInit || opts.NoInit
+		overwrite := structOverwrite || opts.Overwrite
+		required := structRequired || opts.Required
 
 		isNilStructPtr := false
 		setNilStruct := func(v reflect.Value) {
@@ -302,7 +384,7 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 				// If a struct (after traversal) equals to the empty value, it means
 				// nothing was changed in any sub-fields. With the noinit opt, we skip
 				// setting the empty value to the original struct pointer (keep it nil).
-				if !reflect.DeepEqual(v.Interface(), empty) || !shouldNotInit {
+				if !reflect.DeepEqual(v.Interface(), empty) || !noInit {
 					origin.Set(v)
 				}
 			}
@@ -337,7 +419,7 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, _, _, err := lookup(key, opts, l)
+			val, _, _, err := lookup(key, required, opts.Default, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
@@ -356,7 +438,16 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 				plu = PrefixLookuper(opts.Prefix, l)
 			}
 
-			if err := processWith(ctx, ef.Interface(), plu, shouldNotInit, mus...); err != nil {
+			if err := processWith(ctx, &Config{
+				Target:           ef.Interface(),
+				Lookuper:         plu,
+				DefaultDelimiter: delimiter,
+				DefaultSeparator: separator,
+				DefaultNoInit:    noInit,
+				DefaultOverwrite: overwrite,
+				DefaultRequired:  required,
+				Mutators:         mutators,
+			}); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
@@ -377,11 +468,11 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 
 		// The field already has a non-zero value and overwrite is false, do not
 		// overwrite.
-		if (pointerWasSet || !ef.IsZero()) && !opts.Overwrite {
+		if (pointerWasSet || !ef.IsZero()) && !overwrite {
 			continue
 		}
 
-		val, found, usedDefault, err := lookup(key, opts, l)
+		val, found, usedDefault, err := lookup(key, required, opts.Default, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
@@ -405,11 +496,7 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 			originalValue := val
 			stop := false
 
-			for _, mu := range mus {
-				if mu == nil {
-					continue
-				}
-
+			for _, mu := range mutators {
 				val, stop, err = mu.EnvMutate(ctx, originalKey, resolvedKey, originalValue, val)
 				if err != nil {
 					return fmt.Errorf("%s: %w", tf.Name, err)
@@ -420,18 +507,8 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 			}
 		}
 
-		// If Delimiter is not defined set it to ","
-		if opts.Delimiter == "" {
-			opts.Delimiter = defaultDelimiter
-		}
-
-		// If Separator is not defined set it to ":"
-		if opts.Separator == "" {
-			opts.Separator = defaultSeparator
-		}
-
 		// Set value.
-		if err := processField(val, ef, opts.Delimiter, opts.Separator, opts.NoInit); err != nil {
+		if err := processField(val, ef, delimiter, separator, noInit); err != nil {
 			return fmt.Errorf("%s(%q): %w", tf.Name, val, err)
 		}
 	}
@@ -439,10 +516,24 @@ func processWith(ctx context.Context, i any, l Lookuper, parentNoInit bool, mus 
 	return nil
 }
 
+// SplitString splits the given string on the provided rune, unless the rune is
+// escaped by the escape character.
+func splitString(s string, on string, esc string) []string {
+	a := strings.Split(s, on)
+
+	for i := len(a) - 2; i >= 0; i-- {
+		if strings.HasSuffix(a[i], esc) {
+			a[i] = a[i][:len(a[i])-len(esc)] + on + a[i+1]
+			a = append(a[:i+1], a[i+2:]...)
+		}
+	}
+	return a
+}
+
 // keyAndOpts parses the given tag value (e.g. env:"foo,required") and
 // returns the key name and options as a list.
 func keyAndOpts(tag string) (string, *options, error) {
-	parts := strings.Split(tag, ",")
+	parts := splitString(tag, ",", "\\")
 	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
 
 	if key != "" && !validateEnvName(key) {
@@ -485,7 +576,7 @@ LOOP:
 // first boolean parameter indicates whether the value was found in the
 // lookuper. The second boolean parameter indicates whether the default value
 // was used.
-func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
+func lookup(key string, required bool, defaultValue string, l Lookuper) (string, bool, bool, error) {
 	if key == "" {
 		// The struct has something like `env:",required"`, which is likely a
 		// mistake. We could try to infer the envvar from the field name, but that
@@ -493,7 +584,7 @@ func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
 		return "", false, false, ErrMissingKey
 	}
 
-	if opts.Required && opts.Default != "" {
+	if required && defaultValue != "" {
 		// Having a default value on a required value doesn't make sense.
 		return "", false, false, ErrRequiredAndDefault
 	}
@@ -501,7 +592,7 @@ func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
 	// Lookup value.
 	val, found := l.Lookup(key)
 	if !found {
-		if opts.Required {
+		if required {
 			if keyer, ok := l.(KeyedLookuper); ok {
 				key = keyer.Key(key)
 			}
@@ -509,10 +600,10 @@ func lookup(key string, opts *options, l Lookuper) (string, bool, bool, error) {
 			return "", false, false, fmt.Errorf("%w: %s", ErrMissingRequired, key)
 		}
 
-		if opts.Default != "" {
+		if defaultValue != "" {
 			// Expand the default value. This allows for a default value that maps to
 			// a different variable.
-			val = os.Expand(opts.Default, func(i string) string {
+			val = os.Expand(defaultValue, func(i string) string {
 				s, ok := l.Lookup(i)
 				if ok {
 					return s
