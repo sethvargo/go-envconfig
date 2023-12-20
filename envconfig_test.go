@@ -1235,6 +1235,44 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 		{
+			name: "default/expand_prefix",
+			target: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "value",
+			},
+			lookuper: PrefixLookuper("PREFIX_", MapLookuper(map[string]string{
+				// Ensure that we use the underlying MapLookuper instead of the prefixed
+				// value when resolving a default:
+				//
+				//     https://github.com/sethvargo/go-envconfig/issues/85
+				//
+				"DEFAULT": "value",
+			})),
+		},
+		{
+			name: "default/expand_prefix_prefix",
+			target: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "value",
+			},
+			lookuper: PrefixLookuper("OUTER_", PrefixLookuper("INNER_", MapLookuper(map[string]string{
+				// Ensure that we use the underlying MapLookuper instead of the prefixed
+				// value when resolving a default:
+				//
+				//     https://github.com/sethvargo/go-envconfig/issues/85
+				//
+				"DEFAULT": "value",
+			}))),
+		},
+		{
 			name: "default/slice",
 			target: &struct {
 				Field []string `env:"FIELD,default=foo,bar,baz"`
