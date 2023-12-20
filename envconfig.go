@@ -192,6 +192,19 @@ func (p *prefixLookuper) Key(key string) string {
 	return p.prefix + key
 }
 
+func (p *prefixLookuper) Unwrap() Lookuper {
+	l := p.l
+	for v, ok := l.(UnwrappableLookuper); ok; {
+		l = v.Unwrap()
+	}
+	return l
+}
+
+// UnwrappableLookuper is a lookuper that can return the underlying lookuper.
+type UnwrappableLookuper interface {
+	Unwrap() Lookuper
+}
+
 // MultiLookuper wraps a collection of lookupers. It does not combine them, and
 // lookups appear in the order in which they are provided to the initializer.
 func MultiLookuper(lookupers ...Lookuper) Lookuper {
@@ -602,9 +615,14 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 
 		if defaultValue != "" {
 			// Expand the default value. This allows for a default value that maps to
-			// a different variable.
+			// a different environment variable.
 			val = os.Expand(defaultValue, func(i string) string {
-				s, ok := l.Lookup(i)
+				lookuper := l
+				if v, ok := lookuper.(UnwrappableLookuper); ok {
+					lookuper = v.Unwrap()
+				}
+
+				s, ok := lookuper.Lookup(i)
 				if ok {
 					return s
 				}
