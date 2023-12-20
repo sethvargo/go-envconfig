@@ -219,25 +219,37 @@ type Button struct {
 	Name string `env:"NAME, default=POWER"`
 }
 
+type SliceStruct struct {
+	Field []string `env:"FIELD"`
+}
+
+type MapStruct struct {
+	Field map[string]string `env:"FIELD"`
+}
+
 type Base64ByteSlice []Base64Bytes
 
 func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
-	// TODO(sethvargo): switch to accepting [Options]
 	cases := []struct {
-		name     string
-		input    any
-		exp      any
-		lookuper Lookuper
-		mutators []Mutator
-		err      error
-		errMsg   string
+		name         string
+		target       any
+		lookuper     Lookuper
+		defDelimiter string
+		defSeparator string
+		defNoInit    bool
+		defOverwrite bool
+		defRequired  bool
+		mutators     []Mutator
+		exp          any
+		err          error
+		errMsg       string
 	}{
 		// nil pointer
 		{
 			name:     "nil",
-			input:    (*Electron)(nil),
+			target:   (*Electron)(nil),
 			lookuper: MapLookuper(nil),
 			err:      ErrNotStruct,
 		},
@@ -245,7 +257,7 @@ func TestProcessWith(t *testing.T) {
 		// Bool
 		{
 			name: "bool/true",
-			input: &struct {
+			target: &struct {
 				Field bool `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -259,7 +271,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "bool/false",
-			input: &struct {
+			target: &struct {
 				Field bool `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -273,7 +285,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "bool/error",
-			input: &struct {
+			target: &struct {
 				Field bool `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -285,7 +297,7 @@ func TestProcessWith(t *testing.T) {
 		// Float
 		{
 			name: "float32/6.022",
-			input: &struct {
+			target: &struct {
 				Field float32 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -299,7 +311,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "float32/error",
-			input: &struct {
+			target: &struct {
 				Field float32 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -309,7 +321,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "float64/6.022",
-			input: &struct {
+			target: &struct {
 				Field float64 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -323,7 +335,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "float32/error",
-			input: &struct {
+			target: &struct {
 				Field float64 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -335,7 +347,7 @@ func TestProcessWith(t *testing.T) {
 		// Int8-32
 		{
 			name: "int/8675309",
-			input: &struct {
+			target: &struct {
 				Field int `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -349,7 +361,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int/error",
-			input: &struct {
+			target: &struct {
 				Field int `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -359,7 +371,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int8/12",
-			input: &struct {
+			target: &struct {
 				Field int8 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -373,7 +385,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int8/error",
-			input: &struct {
+			target: &struct {
 				Field int8 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -383,7 +395,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int16/1245",
-			input: &struct {
+			target: &struct {
 				Field int16 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -397,7 +409,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int16/error",
-			input: &struct {
+			target: &struct {
 				Field int16 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -407,7 +419,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int32/1245",
-			input: &struct {
+			target: &struct {
 				Field int32 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -421,7 +433,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int32/error",
-			input: &struct {
+			target: &struct {
 				Field int32 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -433,7 +445,7 @@ func TestProcessWith(t *testing.T) {
 		// Int64
 		{
 			name: "int64/1245",
-			input: &struct {
+			target: &struct {
 				Field int64 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -447,7 +459,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int64/error",
-			input: &struct {
+			target: &struct {
 				Field int64 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -457,7 +469,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int64/duration",
-			input: &struct {
+			target: &struct {
 				Field time.Duration `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -471,7 +483,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int64/duration_pointer",
-			input: &struct {
+			target: &struct {
 				Field *time.Duration `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -485,7 +497,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "int64/duration_error",
-			input: &struct {
+			target: &struct {
 				Field time.Duration `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -497,7 +509,7 @@ func TestProcessWith(t *testing.T) {
 		// String
 		{
 			name: "string",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -513,7 +525,7 @@ func TestProcessWith(t *testing.T) {
 		// Uint8-64
 		{
 			name: "uint/8675309",
-			input: &struct {
+			target: &struct {
 				Field uint `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -527,7 +539,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint/error",
-			input: &struct {
+			target: &struct {
 				Field uint `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -537,7 +549,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint8/12",
-			input: &struct {
+			target: &struct {
 				Field uint8 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -551,7 +563,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint8/error",
-			input: &struct {
+			target: &struct {
 				Field uint8 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -561,7 +573,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint16/1245",
-			input: &struct {
+			target: &struct {
 				Field uint16 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -575,7 +587,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint16/error",
-			input: &struct {
+			target: &struct {
 				Field uint16 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -585,7 +597,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint32/1245",
-			input: &struct {
+			target: &struct {
 				Field uint32 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -599,7 +611,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint32/error",
-			input: &struct {
+			target: &struct {
 				Field uint32 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -609,7 +621,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint64/1245",
-			input: &struct {
+			target: &struct {
 				Field uint64 `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -623,7 +635,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uint64/error",
-			input: &struct {
+			target: &struct {
 				Field uint64 `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -633,7 +645,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uintptr/1245",
-			input: &struct {
+			target: &struct {
 				Field uintptr `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -647,7 +659,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "uintptr/error",
-			input: &struct {
+			target: &struct {
 				Field uintptr `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -659,7 +671,7 @@ func TestProcessWith(t *testing.T) {
 		// Map
 		{
 			name: "map/single",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -673,7 +685,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/multi",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -691,7 +703,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/empty",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -705,7 +717,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/key_no_value",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -715,7 +727,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/key_error",
-			input: &struct {
+			target: &struct {
 				Field map[bool]bool `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -725,7 +737,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/value_error",
-			input: &struct {
+			target: &struct {
 				Field map[bool]bool `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -735,7 +747,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/custom_delimiter",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD,delimiter=;"`
 			}{},
 			exp: &struct {
@@ -749,7 +761,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/custom_separator",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD,separator=="`
 			}{},
 			exp: &struct {
@@ -763,7 +775,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "map/custom_separator_error",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD,separator=="`
 			}{},
 			exp: &struct {
@@ -780,7 +792,7 @@ func TestProcessWith(t *testing.T) {
 		// Slices
 		{
 			name: "slice/single",
-			input: &struct {
+			target: &struct {
 				Field []string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -794,7 +806,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "slice/multi",
-			input: &struct {
+			target: &struct {
 				Field []string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -808,7 +820,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "slice/empty",
-			input: &struct {
+			target: &struct {
 				Field []string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -822,7 +834,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "slice/bytes",
-			input: &struct {
+			target: &struct {
 				Field []byte `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -836,7 +848,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "slice/custom_delimiter",
-			input: &struct {
+			target: &struct {
 				Field []string `env:"FIELD,delimiter=;"`
 			}{},
 			exp: &struct {
@@ -852,7 +864,7 @@ func TestProcessWith(t *testing.T) {
 		// Private fields
 		{
 			name: "private/noop",
-			input: &struct {
+			target: &struct {
 				field string
 			}{},
 			exp: &struct {
@@ -864,7 +876,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "private/error",
-			input: &struct {
+			target: &struct {
 				field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -879,7 +891,7 @@ func TestProcessWith(t *testing.T) {
 		// Overwrite
 		{
 			name: "overwrite/present",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,overwrite"`
 			}{
 				Field: "hello world",
@@ -895,7 +907,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/present_space",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite"`
 			}{
 				Field: "hello world",
@@ -911,7 +923,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/does_not_overwrite_no_value",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite"`
 			}{
 				Field: "inside",
@@ -925,7 +937,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/env_overwrites_existing",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite"`
 			}{
 				Field: "inside",
@@ -941,7 +953,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/env_overwrites_empty",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite"`
 			}{},
 			exp: &struct {
@@ -955,7 +967,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/default_does_not_overwrite_no_value",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite, default=default"`
 			}{
 				Field: "inside",
@@ -969,7 +981,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/default_env_overwrites_existing",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite, default=default"`
 			}{
 				Field: "inside",
@@ -985,7 +997,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/default_env_overwrites_empty",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite, default=default"`
 			}{},
 			exp: &struct {
@@ -999,7 +1011,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "overwrite/default_uses_default_when_unspecified",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, overwrite, default=default"`
 			}{},
 			exp: &struct {
@@ -1013,7 +1025,7 @@ func TestProcessWith(t *testing.T) {
 		// Required
 		{
 			name: "required/present",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,required"`
 			}{},
 			exp: &struct {
@@ -1027,7 +1039,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "required/present_space",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, required"`
 			}{},
 			exp: &struct {
@@ -1041,7 +1053,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "required/missing",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,required"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -1049,7 +1061,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "required/missing_space",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, required"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -1057,7 +1069,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "required/default",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,required,default=foo"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -1065,7 +1077,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "required/default_space",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, required, default=foo"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -1075,7 +1087,7 @@ func TestProcessWith(t *testing.T) {
 		// Default
 		{
 			name: "default/missing",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,default=foo"`
 			}{},
 			exp: &struct {
@@ -1087,7 +1099,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/missing_space",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, default=foo"`
 			}{},
 			exp: &struct {
@@ -1099,7 +1111,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/empty",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,default=foo"`
 			}{},
 			exp: &struct {
@@ -1113,7 +1125,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/empty_space",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, default=foo"`
 			}{},
 			exp: &struct {
@@ -1127,7 +1139,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/spaces",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, default=foo bar baz"`
 			}{},
 			exp: &struct {
@@ -1141,7 +1153,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/spaces_expand",
-			input: &struct {
+			target: &struct {
 				Field1 string `env:"FIELD1, default=foo"`
 				Field2 string `env:"FIELD2, default=bar $FIELD1"`
 			}{},
@@ -1158,7 +1170,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/expand",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,default=$DEFAULT"`
 			}{},
 			exp: &struct {
@@ -1172,7 +1184,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/expand_space",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, default=$DEFAULT"`
 			}{},
 			exp: &struct {
@@ -1186,7 +1198,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/expand_empty",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,default=$DEFAULT"`
 			}{},
 			exp: &struct {
@@ -1200,7 +1212,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/expand_nil",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,default=$DEFAULT"`
 			}{},
 			exp: &struct {
@@ -1212,7 +1224,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/expand_nil_typed",
-			input: &struct {
+			target: &struct {
 				Field bool `env:"FIELD,default=$DEFAULT"`
 			}{},
 			exp: &struct {
@@ -1224,7 +1236,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/slice",
-			input: &struct {
+			target: &struct {
 				Field []string `env:"FIELD,default=foo,bar,baz"`
 			}{},
 			exp: &struct {
@@ -1236,7 +1248,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/slice_space",
-			input: &struct {
+			target: &struct {
 				Field []string `env:"FIELD, default=foo,bar,baz"`
 			}{},
 			exp: &struct {
@@ -1248,7 +1260,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/map",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD,default=foo:bar,zip:zap"`
 			}{},
 			exp: &struct {
@@ -1260,7 +1272,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "default/map_spaces",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD, default=foo:bar,zip:zap"`
 			}{},
 			exp: &struct {
@@ -1274,7 +1286,7 @@ func TestProcessWith(t *testing.T) {
 		// Syntax
 		{
 			name: "syntax/=key",
-			input: &struct {
+			target: &struct {
 				Field CustomDecoderType `env:"FIELD=foo"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -1284,7 +1296,7 @@ func TestProcessWith(t *testing.T) {
 		// Custom decoding from standard library interfaces
 		{
 			name: "custom_decoder/gob_decoder",
-			input: &struct {
+			target: &struct {
 				Field CustomStdLibDecodingType `env:"FIELD"`
 			}{
 				Field: CustomStdLibDecodingType{
@@ -1304,7 +1316,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "custom_decoder/binary_unmarshaler",
-			input: &struct {
+			target: &struct {
 				Field CustomStdLibDecodingType `env:"FIELD"`
 			}{
 				Field: CustomStdLibDecodingType{
@@ -1325,7 +1337,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "custom_decoder/json_unmarshaler",
-			input: &struct {
+			target: &struct {
 				Field CustomStdLibDecodingType `env:"FIELD"`
 			}{
 				Field: CustomStdLibDecodingType{
@@ -1348,7 +1360,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "custom_decoder/text_unmarshaler",
-			input: &struct {
+			target: &struct {
 				Field CustomStdLibDecodingType `env:"FIELD"`
 			}{
 				Field: CustomStdLibDecodingType{
@@ -1374,7 +1386,7 @@ func TestProcessWith(t *testing.T) {
 		// Custom decoder
 		{
 			name: "custom_decoder/struct",
-			input: &struct {
+			target: &struct {
 				Field CustomDecoderType `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1390,7 +1402,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "custom_decoder/pointer",
-			input: &struct {
+			target: &struct {
 				Field *CustomDecoderType `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1406,7 +1418,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "custom_decoder/private",
-			input: &struct {
+			target: &struct {
 				field *CustomDecoderType `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -1416,7 +1428,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "custom_decoder/error",
-			input: &struct {
+			target: &struct {
 				Field CustomTypeError `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -1426,7 +1438,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "custom_decoder/called_for_empty_string",
-			input: &struct {
+			target: &struct {
 				Field CustomTypeError `env:"FIELD"`
 			}{},
 			lookuper: MapLookuper(map[string]string{
@@ -1438,7 +1450,7 @@ func TestProcessWith(t *testing.T) {
 		// Expand
 		{
 			name: "expand/not_default",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1454,7 +1466,7 @@ func TestProcessWith(t *testing.T) {
 		// Pointer pointers
 		{
 			name: "pointer_string",
-			input: &struct {
+			target: &struct {
 				Field *string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1468,7 +1480,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_pointer_string",
-			input: &struct {
+			target: &struct {
 				Field **string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1482,7 +1494,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_int",
-			input: &struct {
+			target: &struct {
 				Field *int `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1496,7 +1508,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_map",
-			input: &struct {
+			target: &struct {
 				Field *map[string]string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1510,7 +1522,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_slice",
-			input: &struct {
+			target: &struct {
 				Field *[]string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1524,7 +1536,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1538,7 +1550,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_noinit",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,noinit"`
 			}{},
 			exp: &struct {
@@ -1550,7 +1562,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_field_set_env_unset",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
 				Field: ptrTo(false),
@@ -1564,7 +1576,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_field_set_env_set",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{
 				Field: ptrTo(false),
@@ -1580,7 +1592,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_field_unset_env_set",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{},
 			exp: &struct {
@@ -1594,7 +1606,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_field_unset_env_unset",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,default=true"`
 			}{},
 			exp: &struct {
@@ -1606,7 +1618,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_overwrite_field_set_env_unset",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
 				Field: ptrTo(false),
@@ -1620,7 +1632,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_overwrite_field_set_env_set",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{
 				Field: ptrTo(false),
@@ -1636,7 +1648,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_overwrite_field_unset_env_set",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{},
 			exp: &struct {
@@ -1650,7 +1662,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "pointer_bool_default_overwrite_field_unset_env_unset",
-			input: &struct {
+			target: &struct {
 				Field *bool `env:"FIELD,overwrite,default=true"`
 			}{},
 			exp: &struct {
@@ -1664,7 +1676,7 @@ func TestProcessWith(t *testing.T) {
 		// Marshallers
 		{
 			name: "binarymarshaler",
-			input: &struct {
+			target: &struct {
 				Field url.URL `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1682,7 +1694,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "binarymarshaler_pointer",
-			input: &struct {
+			target: &struct {
 				Field *url.URL `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1700,7 +1712,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "gob",
-			input: &struct {
+			target: &struct {
 				Field time.Time `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1717,7 +1729,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "gob_pointer",
-			input: &struct {
+			target: &struct {
 				Field *time.Time `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1734,7 +1746,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "jsonmarshaler",
-			input: &struct {
+			target: &struct {
 				Field time.Time `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1751,7 +1763,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "jsonmarshaler_pointer",
-			input: &struct {
+			target: &struct {
 				Field *time.Time `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1768,7 +1780,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "textmarshaler",
-			input: &struct {
+			target: &struct {
 				Field time.Time `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1785,7 +1797,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "textmarshaler_pointer",
-			input: &struct {
+			target: &struct {
 				Field *time.Time `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1804,7 +1816,7 @@ func TestProcessWith(t *testing.T) {
 		// Mutators
 		{
 			name: "mutate",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1819,7 +1831,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "mutate/custom",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1836,7 +1848,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "mutate/stops",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1858,7 +1870,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "mutate/original_and_resolved_keys",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1877,7 +1889,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "mutate/original_and_current_values",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1899,7 +1911,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "mutate/halts_error",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -1921,8 +1933,8 @@ func TestProcessWith(t *testing.T) {
 
 		// Nesting
 		{
-			name:  "nested_pointer_structs",
-			input: &Electron{},
+			name:   "nested_pointer_structs",
+			target: &Electron{},
 			exp: &Electron{
 				Name: "shocking",
 				Lepton: &Lepton{
@@ -1939,8 +1951,8 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name:  "nested_structs",
-			input: &Sandwich{},
+			name:   "nested_structs",
+			target: &Sandwich{},
 			exp: &Sandwich{
 				Name: "yummy",
 				Bread: Bread{
@@ -1957,8 +1969,8 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name:  "nested_mutation",
-			input: &Sandwich{},
+			name:   "nested_mutation",
+			target: &Sandwich{},
 			exp: &Sandwich{
 				Name: "MUTATED_yummy",
 				Bread: Bread{
@@ -1979,7 +1991,7 @@ func TestProcessWith(t *testing.T) {
 		// Overwriting
 		{
 			name: "no_overwrite/structs",
-			input: &Electron{
+			target: &Electron{
 				Name: "original",
 				Lepton: &Lepton{
 					Name: "original",
@@ -2005,7 +2017,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "no_overwrite/pointers",
-			input: &struct {
+			target: &struct {
 				Field *string `env:"FIELD"`
 			}{
 				Field: ptrTo("bar"),
@@ -2021,7 +2033,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "no_overwrite/pointers_pointers",
-			input: &struct {
+			target: &struct {
 				Field **string `env:"FIELD"`
 			}{
 				Field: ptrTo(ptrTo("bar")),
@@ -2039,7 +2051,7 @@ func TestProcessWith(t *testing.T) {
 		// Unknown options
 		{
 			name: "unknown_options",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD,cookies"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -2049,7 +2061,7 @@ func TestProcessWith(t *testing.T) {
 		// Lookup prefixes
 		{
 			name: "lookup_prefixes",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -2064,8 +2076,8 @@ func TestProcessWith(t *testing.T) {
 
 		// Embedded prefixes
 		{
-			name:  "embedded_prefixes/pointers",
-			input: &TV{},
+			name:   "embedded_prefixes/pointers",
+			target: &TV{},
 			exp: &TV{
 				Name: "tv",
 				Remote: &Remote{
@@ -2082,8 +2094,8 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name:  "embedded_prefixes/values",
-			input: &VCR{},
+			name:   "embedded_prefixes/values",
+			target: &VCR{},
 			exp: &VCR{
 				Name: "vcr",
 				Remote: Remote{
@@ -2100,8 +2112,8 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			name:  "embedded_prefixes/defaults",
-			input: &TV{},
+			name:   "embedded_prefixes/defaults",
+			target: &TV{},
 			exp: &TV{
 				Name: "tv",
 				Remote: &Remote{
@@ -2118,7 +2130,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "embedded_prefixes/error",
-			input: &struct {
+			target: &struct {
 				Field string `env:",prefix=FIELD_"`
 			}{},
 			err:      ErrPrefixNotStruct,
@@ -2128,7 +2140,7 @@ func TestProcessWith(t *testing.T) {
 		// Init (default behavior)
 		{
 			name: "init/basic",
-			input: &struct {
+			target: &struct {
 				Field1 string    `env:"FIELD1"`
 				Field2 bool      `env:"FIELD2"`
 				Field3 int64     `env:"FIELD3"`
@@ -2152,7 +2164,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "init/structs",
-			input: &struct {
+			target: &struct {
 				Electron *Electron
 			}{},
 			exp: &struct {
@@ -2174,7 +2186,7 @@ func TestProcessWith(t *testing.T) {
 		// No init
 		{
 			name: "noinit/no_init_when_sub_fields_unset",
-			input: &struct {
+			target: &struct {
 				Sub *struct {
 					Field string `env:"FIELD"`
 				} `env:",noinit"`
@@ -2192,7 +2204,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/no_init_when_sub_sub_fields_unset",
-			input: &struct {
+			target: &struct {
 				Lepton *Lepton `env:",noinit"`
 			}{},
 			exp: &struct {
@@ -2205,7 +2217,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/no_init_from_parent",
-			input: &struct {
+			target: &struct {
 				Electron *Electron `env:"FIELD,noinit"`
 			}{},
 			exp: &struct {
@@ -2217,7 +2229,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/no_init_when_decoder",
-			input: &struct {
+			target: &struct {
 				Parent *struct {
 					Field url.URL
 				} `env:",noinit"`
@@ -2234,7 +2246,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/init_when_sub_fields_set",
-			input: &struct {
+			target: &struct {
 				Sub *struct {
 					Field string `env:"FIELD"`
 				} `env:",noinit"`
@@ -2258,7 +2270,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/init_when_sub_sub_fields_set",
-			input: &struct {
+			target: &struct {
 				Lepton *Lepton `env:",noinit"`
 			}{},
 			exp: &struct {
@@ -2277,7 +2289,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/non_struct_ptr",
-			input: &struct {
+			target: &struct {
 				Field1 *string  `env:"FIELD1, noinit"`
 				Field2 *int     `env:"FIELD2, noinit"`
 				Field3 *float64 `env:"FIELD3, noinit"`
@@ -2303,7 +2315,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/map",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD, noinit"`
 			}{},
 			exp: &struct {
@@ -2315,7 +2327,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/slice",
-			input: &struct {
+			target: &struct {
 				Field []string `env:"FIELD, noinit"`
 			}{},
 			exp: &struct {
@@ -2327,7 +2339,7 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/unsafe_pointer",
-			input: &struct {
+			target: &struct {
 				Field unsafe.Pointer `env:"FIELD, noinit"`
 			}{},
 			exp: &struct {
@@ -2339,18 +2351,205 @@ func TestProcessWith(t *testing.T) {
 		},
 		{
 			name: "noinit/error_not_ptr",
-			input: &struct {
+			target: &struct {
 				Field string `env:"FIELD, noinit"`
 			}{},
 			err:      ErrNoInitNotPtr,
 			lookuper: MapLookuper(nil),
 		},
 
+		// Inherited configuration
+		{
+			name: "inherited/delimiter",
+			target: &struct {
+				Sub *SliceStruct `env:", delimiter=;"`
+			}{},
+			exp: &struct {
+				Sub *SliceStruct `env:", delimiter=;"`
+			}{
+				Sub: &SliceStruct{
+					Field: []string{"foo,", "bar|"},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo,;bar|",
+			}),
+		},
+		{
+			name: "inherited/separator",
+			target: &struct {
+				Sub *MapStruct `env:", separator=@"`
+			}{},
+			exp: &struct {
+				Sub *MapStruct `env:", separator=@"`
+			}{
+				Sub: &MapStruct{
+					Field: map[string]string{"foo:": "bar=", "zip": "zap"},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo:@bar=,zip@zap",
+			}),
+		},
+		{
+			name: "inherited/delimiter_separator",
+			target: &struct {
+				Sub *MapStruct `env:", delimiter=;, separator=@"`
+			}{},
+			exp: &struct {
+				Sub *MapStruct `env:", delimiter=;, separator=@"`
+			}{
+				Sub: &MapStruct{
+					Field: map[string]string{"foo,": "bar=", "zip": "zap,"},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo,@bar=;zip@zap,",
+			}),
+		},
+		{
+			name: "inherited/no_init",
+			target: &struct {
+				Sub *MapStruct `env:", noinit"`
+			}{},
+			exp: &struct {
+				Sub *MapStruct `env:", noinit"`
+			}{
+				Sub: nil,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "inherited/overwrite",
+			target: &struct {
+				Sub *SliceStruct `env:", overwrite"`
+			}{
+				Sub: &SliceStruct{
+					Field: []string{"foo", "bar"},
+				},
+			},
+			exp: &struct {
+				Sub *SliceStruct `env:", overwrite"`
+			}{
+				Sub: &SliceStruct{
+					Field: []string{"zip", "zap"},
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "zip,zap",
+			}),
+		},
+		{
+			name: "inherited/required",
+			target: &struct {
+				Sub *SliceStruct `env:", required"`
+			}{},
+			lookuper: MapLookuper(nil),
+			err:      ErrMissingRequired,
+		},
+
+		// Global configuration
+		{
+			name: "global/delimiter",
+			target: &struct {
+				Sub *SliceStruct
+			}{},
+			exp: &struct {
+				Sub *SliceStruct
+			}{
+				Sub: &SliceStruct{
+					Field: []string{"foo,", "bar|"},
+				},
+			},
+			defDelimiter: ";",
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo,;bar|",
+			}),
+		},
+		{
+			name: "global/separator",
+			target: &struct {
+				Sub *MapStruct
+			}{},
+			exp: &struct {
+				Sub *MapStruct
+			}{
+				Sub: &MapStruct{
+					Field: map[string]string{"foo:": "bar=", "zip": "zap"},
+				},
+			},
+			defSeparator: "@",
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo:@bar=,zip@zap",
+			}),
+		},
+		{
+			name: "global/delimiter_separator",
+			target: &struct {
+				Sub *MapStruct
+			}{},
+			exp: &struct {
+				Sub *MapStruct
+			}{
+				Sub: &MapStruct{
+					Field: map[string]string{"foo,": "bar=", "zip": "zap,"},
+				},
+			},
+			defDelimiter: ";",
+			defSeparator: "@",
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo,@bar=;zip@zap,",
+			}),
+		},
+		{
+			name: "global/no_init",
+			target: &struct {
+				Sub *MapStruct
+			}{},
+			exp: &struct {
+				Sub *MapStruct
+			}{
+				Sub: nil,
+			},
+			defNoInit: true,
+			lookuper:  MapLookuper(nil),
+		},
+		{
+			name: "global/overwrite",
+			target: &struct {
+				Sub *SliceStruct
+			}{
+				Sub: &SliceStruct{
+					Field: []string{"foo", "bar"},
+				},
+			},
+			exp: &struct {
+				Sub *SliceStruct
+			}{
+				Sub: &SliceStruct{
+					Field: []string{"zip", "zap"},
+				},
+			},
+			defOverwrite: true,
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "zip,zap",
+			}),
+		},
+		{
+			name: "global/required",
+			target: &struct {
+				Sub *SliceStruct
+			}{},
+			defRequired: true,
+			lookuper:    MapLookuper(nil),
+			err:         ErrMissingRequired,
+		},
+
 		// Issues - this section is specific to reproducing issues
 		{
 			// github.com/sethvargo/go-envconfig/issues/13
 			name: "process_fields_after_decoder",
-			input: &struct {
+			target: &struct {
 				Field1 time.Time `env:"FIELD1"`
 				Field2 string    `env:"FIELD2"`
 			}{},
@@ -2369,7 +2568,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/16
 			name: "custom_decoder_nested",
-			input: &struct {
+			target: &struct {
 				Field Base64ByteSlice `env:"FIELD"`
 			}{},
 			exp: &struct {
@@ -2390,7 +2589,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/28
 			name:   "embedded_prefixes/error-keys",
-			input:  &VCR{},
+			target: &VCR{},
 			errMsg: "VCR_REMOTE_NAME",
 			lookuper: MapLookuper(map[string]string{
 				"NAME":                   "vcr",
@@ -2400,7 +2599,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/61
 			name: "custom_decoder_overwrite_uses_default",
-			input: &struct {
+			target: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{},
 			exp: &struct {
@@ -2413,7 +2612,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/61
 			name: "custom_decoder_overwrite_unset",
-			input: &struct {
+			target: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{},
 			exp: &struct {
@@ -2428,7 +2627,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/61
 			name: "custom_decoder_overwrite_existing_value",
-			input: &struct {
+			target: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
 				Level: InfoLevel,
@@ -2443,7 +2642,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/61
 			name: "custom_decoder_overwrite_existing_value_envvar",
-			input: &struct {
+			target: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
 				Level: InfoLevel,
@@ -2460,7 +2659,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/64
 			name: "custom_decoder_uses_decoder_no_env",
-			input: &struct {
+			target: &struct {
 				URL *url.URL
 			}{},
 			exp: &struct {
@@ -2473,7 +2672,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/64
 			name: "custom_decoder_uses_decoder_env_no_value",
-			input: &struct {
+			target: &struct {
 				URL *url.URL `env:"URL"`
 			}{},
 			exp: &struct {
@@ -2486,7 +2685,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/64
 			name: "custom_decoder_uses_decoder_env_with_value",
-			input: &struct {
+			target: &struct {
 				URL *url.URL `env:"URL"`
 			}{},
 			exp: &struct {
@@ -2504,7 +2703,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/79
 			name: "space_delimiter",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD,delimiter= "`
 			}{},
 			exp: &struct {
@@ -2519,7 +2718,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			// https://github.com/sethvargo/go-envconfig/issues/79
 			name: "space_separator",
-			input: &struct {
+			target: &struct {
 				Field map[string]string `env:"FIELD,separator= "`
 			}{},
 			exp: &struct {
@@ -2541,15 +2740,14 @@ func TestProcessWith(t *testing.T) {
 
 			ctx := context.Background()
 			if err := ProcessWith(ctx, &Config{
-				Target:   tc.input,
-				Lookuper: tc.lookuper,
-				// TODO(sethvargo): more coverage
-				// DefaultDelimiter: "",
-				// DefaultSeparator: "",
-				// DefaultNoInit:    false,
-				// DefaultOverwrite: false,
-				// DefaultRequired:  false,
-				Mutators: tc.mutators,
+				Target:           tc.target,
+				Lookuper:         tc.lookuper,
+				DefaultDelimiter: tc.defDelimiter,
+				DefaultSeparator: tc.defSeparator,
+				DefaultNoInit:    tc.defNoInit,
+				DefaultOverwrite: tc.defOverwrite,
+				DefaultRequired:  tc.defRequired,
+				Mutators:         tc.mutators,
 			}); err != nil {
 				if tc.err == nil && tc.errMsg == "" {
 					t.Fatal(err)
@@ -2580,7 +2778,7 @@ func TestProcessWith(t *testing.T) {
 				// Anonymous struct with private fields
 				struct{ field string }{},
 			)
-			if diff := cmp.Diff(tc.exp, tc.input, opts); diff != "" {
+			if diff := cmp.Diff(tc.exp, tc.target, opts); diff != "" {
 				t.Fatalf("mismatch (-want, +got):\n%s", diff)
 			}
 		})
