@@ -1,6 +1,6 @@
 # Envconfig
 
-[![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://pkg.go.dev/mod/github.com/sethvargo/go-envconfig)
+[![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)][godoc]
 
 Envconfig populates struct field values based on environment variables or
 arbitrary lookup functions. It supports pre-setting mutations, which is useful
@@ -289,8 +289,9 @@ type MyStruct struct {
 
 ```go
 // Process variables, but look for the "APP_" prefix.
-l := envconfig.PrefixLookuper("APP_", envconfig.OsLookuper())
-if err := envconfig.ProcessWith(ctx, &c, l); err != nil {
+if err := envconfig.ProcessWith(ctx, &c, &envconfig.Config{
+  Lookuper: envconfig.PrefixLookuper("APP_", envconfig.OsLookuper()),
+}); err != nil {
   panic(err)
 }
 ```
@@ -372,7 +373,10 @@ func resolveSecretFunc(ctx context.Context, originalKey, resolvedKey, originalVa
 }
 
 var config Config
-envconfig.ProcessWith(ctx, &config, envconfig.OsLookuper(), resolveSecretFunc)
+envconfig.ProcessWith(ctx, &config, &envconfig.Config{
+  Lookuper:  envconfig.OsLookuper(),
+  Mutators: []envconfig.Mutator{resolveSecretFunc},
+})
 ```
 
 Mutators are like middleware, and they have access to the initial and current
@@ -438,11 +442,13 @@ type Config struct {
 }
 
 var config Config
-lookuper := envconfig.PrefixLookuper("REDIS_", envconfig.MapLookuper(map[string]string{
-  "PASSWORD": "original",
-}))
 mutators := []envconfig.Mutators{mutatorFunc1, mutatorFunc2, mutatorFunc3}
-envconfig.ProcessWith(ctx, &config, lookuper, mutators...)
+envconfig.ProcessWith(ctx, &config, &envconfig.Config{
+  Lookuper: envconfig.PrefixLookuper("REDIS_", envconfig.MapLookuper(map[string]string{
+    "PASSWORD": "original",
+  })),
+  Mutators: mutators,
+})
 
 func mutatorFunc1(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (string, bool, error) {
   // originalKey is "PASSWORD"
@@ -467,6 +473,11 @@ func mutatorFunc3(ctx context.Context, originalKey, resolvedKey, originalValue, 
 ```
 
 
+## Advanced Processing
+
+See the [godoc][] for examples.
+
+
 ## Testing
 
 Relying on the environment in tests can be troublesome because environment
@@ -480,7 +491,9 @@ lookuper := envconfig.MapLookuper(map[string]string{
 })
 
 var config Config
-envconfig.ProcessWith(ctx, &config, lookuper)
+envconfig.ProcessWith(ctx, &config, &envconfig.Config{
+  Lookuper: lookuper,
+})
 ```
 
 Now you can parallelize all your tests by providing a map for the lookup
@@ -491,20 +504,4 @@ You can also combine multiple lookupers with `MultiLookuper`. See the GoDoc for
 more information and examples.
 
 
-## Inspiration
-
-This library is conceptually similar to [kelseyhightower/envconfig](https://github.com/kelseyhightower/envconfig), with the following
-major behavioral differences:
-
--   Adds support for specifying a custom lookup function (such as a map), which
-    is useful for testing.
-
--   Only populates fields if they contain zero or nil values if `overwrite` is
-    unset. This means you can pre-initialize a struct and any pre-populated
-    fields will not be overwritten during processing.
-
--   Support for interpolation. The default value for a field can be the value of
-    another field.
-
--   Support for arbitrary mutators that change/resolve data before type
-    conversion.
+[godoc]: https://pkg.go.dev/mod/github.com/sethvargo/go-envconfig
