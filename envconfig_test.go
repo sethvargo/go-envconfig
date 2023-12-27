@@ -47,21 +47,21 @@ func (c *CustomDecoderType) EnvDecode(val string) error {
 type Level int8
 
 const (
-	DebugLevel Level = 0
-	InfoLevel  Level = 5
-	ErrorLevel Level = 100
+	LevelDebug Level = 0
+	LevelInfo  Level = 5
+	LevelError Level = 100
 )
 
 func (l *Level) UnmarshalText(text []byte) error {
 	switch string(text) {
 	case "debug":
-		*l = DebugLevel
+		*l = LevelDebug
 		return nil
 	case "info", "": // default
-		*l = InfoLevel
+		*l = LevelInfo
 		return nil
 	case "error":
-		*l = ErrorLevel
+		*l = LevelError
 		return nil
 	default:
 		return fmt.Errorf("unknown level %s", string(text))
@@ -233,18 +233,19 @@ func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name         string
-		target       any
-		lookuper     Lookuper
-		defDelimiter string
-		defSeparator string
-		defNoInit    bool
-		defOverwrite bool
-		defRequired  bool
-		mutators     []Mutator
-		exp          any
-		err          error
-		errMsg       string
+		name           string
+		target         any
+		lookuper       Lookuper
+		defDelimiter   string
+		defSeparator   string
+		defNoInit      bool
+		defOverwrite   bool
+		defDecodeUnset bool
+		defRequired    bool
+		mutators       []Mutator
+		exp            any
+		err            error
+		errMsg         string
 	}{
 		// nil pointer
 		{
@@ -1022,6 +1023,44 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 
+		// Decode Unset
+		{
+			name: "decodeunset/present",
+			target: &struct {
+				Field Level `env:"FIELD,decodeunset"`
+			}{},
+			exp: &struct {
+				Field Level `env:"FIELD,decodeunset"`
+			}{
+				Field: LevelInfo,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decodeunset/present_space",
+			target: &struct {
+				Field Level `env:"FIELD, decodeunset"`
+			}{},
+			exp: &struct {
+				Field Level `env:"FIELD, decodeunset"`
+			}{
+				Field: LevelInfo,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decodeunset/present_camelcase",
+			target: &struct {
+				Field Level `env:"FIELD, decodeUnset"`
+			}{},
+			exp: &struct {
+				Field Level `env:"FIELD, decodeUnset"`
+			}{
+				Field: LevelInfo,
+			},
+			lookuper: MapLookuper(nil),
+		},
+
 		// Required
 		{
 			name: "required/present",
@@ -1483,6 +1522,34 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "",
 			}),
 			errMsg: "broken",
+		},
+		{
+			name: "custom_decoder/called_when_default",
+			target: &struct {
+				Field *CustomDecoderType `env:"FIELD, default=foo"`
+			}{},
+			exp: &struct {
+				Field *CustomDecoderType `env:"FIELD, default=foo"`
+			}{
+				Field: &CustomDecoderType{
+					value: "CUSTOM-foo",
+				},
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "custom_decoder/called_on_decodeunset",
+			target: &struct {
+				Field *CustomDecoderType `env:"FIELD, decodeunset"`
+			}{},
+			exp: &struct {
+				Field *CustomDecoderType `env:"FIELD, decodeunset"`
+			}{
+				Field: &CustomDecoderType{
+					value: "CUSTOM-",
+				},
+			},
+			lookuper: MapLookuper(nil),
 		},
 
 		// Expand
@@ -2478,6 +2545,26 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "inherited/decodeunset",
+			target: &struct {
+				Sub *struct {
+					Level Level `env:"FIELD, decodeunset"`
+				}
+			}{},
+			exp: &struct {
+				Sub *struct {
+					Level Level `env:"FIELD, decodeunset"`
+				}
+			}{
+				Sub: &struct {
+					Level Level `env:"FIELD, decodeunset"`
+				}{
+					Level: LevelInfo,
+				},
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
 			name: "inherited/required",
 			target: &struct {
 				Sub *SliceStruct `env:", required"`
@@ -2574,6 +2661,27 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "global/decodeunset",
+			target: &struct {
+				Sub *struct {
+					Level Level `env:"LEVEL"`
+				}
+			}{},
+			exp: &struct {
+				Sub *struct {
+					Level Level `env:"LEVEL"`
+				}
+			}{
+				Sub: &struct {
+					Level Level `env:"LEVEL"`
+				}{
+					Level: LevelInfo,
+				},
+			},
+			defDecodeUnset: true,
+			lookuper:       MapLookuper(nil),
+		},
+		{
 			name: "global/required",
 			target: &struct {
 				Sub *SliceStruct
@@ -2643,7 +2751,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
-				Level: ErrorLevel,
+				Level: LevelError,
 			},
 			lookuper: MapLookuper(nil),
 		},
@@ -2656,7 +2764,7 @@ func TestProcessWith(t *testing.T) {
 			exp: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
-				Level: DebugLevel,
+				Level: LevelDebug,
 			},
 			lookuper: MapLookuper(map[string]string{
 				"LEVEL": "debug",
@@ -2668,12 +2776,12 @@ func TestProcessWith(t *testing.T) {
 			target: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
-				Level: InfoLevel,
+				Level: LevelInfo,
 			},
 			exp: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
-				Level: InfoLevel,
+				Level: LevelInfo,
 			},
 			lookuper: MapLookuper(nil),
 		},
@@ -2683,12 +2791,12 @@ func TestProcessWith(t *testing.T) {
 			target: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
-				Level: InfoLevel,
+				Level: LevelInfo,
 			},
 			exp: &struct {
 				Level Level `env:"LEVEL,overwrite,default=error"`
 			}{
-				Level: DebugLevel,
+				Level: LevelDebug,
 			},
 			lookuper: MapLookuper(map[string]string{
 				"LEVEL": "debug",
@@ -2698,25 +2806,12 @@ func TestProcessWith(t *testing.T) {
 			// https://github.com/sethvargo/go-envconfig/issues/64
 			name: "custom_decoder_uses_decoder_no_env",
 			target: &struct {
-				URL *url.URL
+				URL *url.URL `env:",noinit"`
 			}{},
 			exp: &struct {
-				URL *url.URL
+				URL *url.URL `env:",noinit"`
 			}{
-				URL: &url.URL{},
-			},
-			lookuper: MapLookuper(nil),
-		},
-		{
-			// https://github.com/sethvargo/go-envconfig/issues/64
-			name: "custom_decoder_uses_decoder_env_no_value",
-			target: &struct {
-				URL *url.URL `env:"URL"`
-			}{},
-			exp: &struct {
-				URL *url.URL `env:"URL"`
-			}{
-				URL: &url.URL{},
+				URL: nil,
 			},
 			lookuper: MapLookuper(nil),
 		},
@@ -2778,14 +2873,15 @@ func TestProcessWith(t *testing.T) {
 
 			ctx := context.Background()
 			if err := ProcessWith(ctx, &Config{
-				Target:           tc.target,
-				Lookuper:         tc.lookuper,
-				DefaultDelimiter: tc.defDelimiter,
-				DefaultSeparator: tc.defSeparator,
-				DefaultNoInit:    tc.defNoInit,
-				DefaultOverwrite: tc.defOverwrite,
-				DefaultRequired:  tc.defRequired,
-				Mutators:         tc.mutators,
+				Target:             tc.target,
+				Lookuper:           tc.lookuper,
+				DefaultDelimiter:   tc.defDelimiter,
+				DefaultSeparator:   tc.defSeparator,
+				DefaultNoInit:      tc.defNoInit,
+				DefaultOverwrite:   tc.defOverwrite,
+				DefaultDecodeUnset: tc.defDecodeUnset,
+				DefaultRequired:    tc.defRequired,
+				Mutators:           tc.mutators,
 			}); err != nil {
 				if tc.err == nil && tc.errMsg == "" {
 					t.Fatal(err)
