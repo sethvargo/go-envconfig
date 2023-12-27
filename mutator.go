@@ -16,32 +16,48 @@ package envconfig
 
 import "context"
 
+// Mutator is the interface for a mutator function. Mutators act like middleware
+// and alter values for subsequent processing. This is useful if you want to
+// mutate the environment variable value before it's converted to the proper
+// type.
+//
+// Mutators are only called on defined values (or when decodeunset is true).
 type Mutator interface {
+	// EnvMutate is called to alter the environment variable value.
+	//
+	//   - `originalKey` is the unmodified environment variable name as it was defined
+	//     on the struct.
+	//
+	//   - `resolvedKey` is the fully-resolved environment variable name, which may
+	//     include prefixes or modifications from processing. When there are
+	//     no modifications, this will be equivalent to `originalKey`.
+	//
+	//   - `originalValue` is the unmodified environment variable's value before any
+	//     mutations were run.
+	//
+	//   - `currentValue` is the currently-resolved value, which may have been
+	//     modified by previous mutators and may be modified in the future by
+	//     subsequent mutators in the stack.
+	//
+	// The function returns (in order):
+	//
+	//   - The new value to use in both future mutations and final processing.
+	//
+	//   - A boolean which indicates whether future mutations in the stack should be
+	//     applied.
+	//
+	//   - Any errors that occurred.
+	//
 	EnvMutate(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error)
 }
 
-// MutatorFunc is a function that mutates a given value before it is passed
-// along for processing. This is useful if you want to mutate the environment
-// variable value before it's converted to the proper type.
-//
-//   - `originalKey` is the unmodified environment variable name as it was defined
-//     on the struct.
-//
-//   - `resolvedKey` is the fully-resolved environment variable name, which may
-//     include prefixes or modifications from processing. When there are
-//     no modifications, this will be equivalent to `originalKey`.
-//
-//   - `originalValue` is the unmodified environment variable's value before any
-//     mutations were run.
-//
-//   - `currentValue` is the currently-resolved value, which may have been
-//     modified by previous mutators and may be modified in the future by
-//     subsequent mutators in the stack.
-//
-// It returns the new value, a boolean which indicates whether future mutations
-// in the stack should be applied, and any errors that occurred.
+var _ Mutator = (MutatorFunc)(nil)
+
+// MutatorFunc implements the [Mutator] and provides a quick way to create an
+// anonymous function.
 type MutatorFunc func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error)
 
+// EnvMutate implements [Mutator].
 func (m MutatorFunc) EnvMutate(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
 	return m(ctx, originalKey, resolvedKey, originalValue, currentValue)
 }
@@ -51,7 +67,7 @@ func (m MutatorFunc) EnvMutate(ctx context.Context, originalKey, resolvedKey, or
 // returns a new one. Since the former mutator function had less data, this is
 // inherently lossy.
 //
-// DEPRECATED: Change type signatures to [MutatorFunc] instead.
+// Deprecated: Use [MutatorFunc] instead.
 func LegacyMutatorFunc(fn func(ctx context.Context, key, value string) (string, error)) MutatorFunc {
 	return func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
 		v, err := fn(ctx, originalKey, currentValue)
