@@ -13,7 +13,7 @@ Define a struct with fields using the `env` tag:
 
 ```go
 type MyConfig struct {
-  Port     string    `env:"PORT"`
+  Port     string `env:"PORT"`
   Username string `env:"USERNAME"`
 }
 ```
@@ -59,7 +59,7 @@ type MyConfig struct {
 }
 
 type DatabaseConfig struct {
-  Port     string    `env:"PORT"`
+  Port     string `env:"PORT"`
   Username string `env:"USERNAME"`
 }
 ```
@@ -118,7 +118,7 @@ examples.
 
     ```go
     type MyStruct struct {
-      Port string `env:"PORT,overwrite"`
+      Port string `env:"PORT, overwrite"`
     }
     ```
 
