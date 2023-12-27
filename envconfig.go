@@ -82,13 +82,14 @@ import (
 const (
 	envTag = "env"
 
-	optDefault   = "default="
-	optDelimiter = "delimiter="
-	optNoInit    = "noinit"
-	optOverwrite = "overwrite"
-	optPrefix    = "prefix="
-	optRequired  = "required"
-	optSeparator = "separator="
+	optDecodeUnset = "decodeunset"
+	optDefault     = "default="
+	optDelimiter   = "delimiter="
+	optNoInit      = "noinit"
+	optOverwrite   = "overwrite"
+	optPrefix      = "prefix="
+	optRequired    = "required"
+	optSeparator   = "separator="
 )
 
 // Error is a custom error type for errors returned by envconfig.
@@ -231,13 +232,14 @@ type Decoder interface {
 
 // options are internal options for decoding.
 type options struct {
-	Default   string
-	Delimiter string
-	Prefix    string
-	Separator string
-	NoInit    bool
-	Overwrite bool
-	Required  bool
+	Default     string
+	Delimiter   string
+	Prefix      string
+	Separator   string
+	NoInit      bool
+	Overwrite   bool
+	DecodeUnset bool
+	Required    bool
 }
 
 // Config represent inputs to the envconfig decoding.
@@ -267,6 +269,10 @@ type Config struct {
 	// DefaultOverwrite is the default value for overwriting an existing value set
 	// on the struct before processing. The default value is false.
 	DefaultOverwrite bool
+
+	// DefaultDecodeUnset is the default value for running decoders even when no
+	// value was given for the environment variable.
+	DefaultDecodeUnset bool
 
 	// DefaultRequired is the default value for marking a field as required. The
 	// default value is false.
@@ -339,6 +345,7 @@ func processWith(ctx context.Context, c *Config) error {
 	}
 
 	structOverwrite := c.DefaultOverwrite
+	structDecodeUnset := c.DefaultDecodeUnset
 	structRequired := c.DefaultRequired
 
 	mutators := c.Mutators
@@ -386,6 +393,7 @@ func processWith(ctx context.Context, c *Config) error {
 
 		noInit := structNoInit || opts.NoInit
 		overwrite := structOverwrite || opts.Overwrite
+		decodeUnset := structDecodeUnset || opts.DecodeUnset
 		required := structRequired || opts.Required
 
 		isNilStructPtr := false
@@ -432,18 +440,20 @@ func processWith(ctx context.Context, c *Config) error {
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, _, _, err := lookup(key, required, opts.Default, l)
+			val, found, usedDefault, err := lookup(key, required, opts.Default, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
-			if ok, err := processAsDecoder(val, ef); ok {
-				if err != nil {
-					return err
-				}
+			if found || usedDefault || decodeUnset {
+				if ok, err := processAsDecoder(val, ef); ok {
+					if err != nil {
+						return err
+					}
 
-				setNilStruct(ef)
-				continue
+					setNilStruct(ef)
+					continue
+				}
 			}
 
 			plu := l
@@ -558,20 +568,24 @@ func keyAndOpts(tag string) (string, *options, error) {
 LOOP:
 	for i, o := range tagOpts {
 		o = strings.TrimLeftFunc(o, unicode.IsSpace)
+		search := strings.ToLower(o)
+
 		switch {
-		case o == optOverwrite:
+		case search == optDecodeUnset:
+			opts.DecodeUnset = true
+		case search == optOverwrite:
 			opts.Overwrite = true
-		case o == optRequired:
+		case search == optRequired:
 			opts.Required = true
-		case o == optNoInit:
+		case search == optNoInit:
 			opts.NoInit = true
-		case strings.HasPrefix(o, optPrefix):
+		case strings.HasPrefix(search, optPrefix):
 			opts.Prefix = strings.TrimPrefix(o, optPrefix)
-		case strings.HasPrefix(o, optDelimiter):
+		case strings.HasPrefix(search, optDelimiter):
 			opts.Delimiter = strings.TrimPrefix(o, optDelimiter)
-		case strings.HasPrefix(o, optSeparator):
+		case strings.HasPrefix(search, optSeparator):
 			opts.Separator = strings.TrimPrefix(o, optSeparator)
-		case strings.HasPrefix(o, optDefault):
+		case strings.HasPrefix(search, optDefault):
 			// If a default value was given, assume everything after is the provided
 			// value, including comma-seprated items.
 			o = strings.TrimLeft(strings.Join(tagOpts[i:], ","), " ")
