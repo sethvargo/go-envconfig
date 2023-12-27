@@ -46,22 +46,7 @@
 //
 //	export MYVAR="a:b,c:d" // map[string]string{"a":"b", "c":"d"}
 //
-// If you need to modify environment variable values before processing, you can
-// specify a custom mutator:
-//
-//	type Config struct {
-//	  Password `env:"PASSWORD_SECRET"`
-//	}
-//
-//	func resolveSecretFunc(ctx context.Context, key, value string) (string, error) {
-//	  if strings.HasPrefix(value, "secret://") {
-//	    return secretmanager.Resolve(ctx, value) // example
-//	  }
-//	  return value, nil
-//	}
-//
-//	var config Config
-//	ProcessWith(&config, OsLookuper(), resolveSecretFunc)
+// For more configuration options and examples, see the documentation.
 package envconfig
 
 import (
@@ -92,27 +77,27 @@ const (
 	optSeparator   = "separator="
 )
 
-// Error is a custom error type for errors returned by envconfig.
-type Error string
+// internalError is a custom error type for errors returned by envconfig.
+type internalError string
 
 // Error implements error.
-func (e Error) Error() string {
+func (e internalError) Error() string {
 	return string(e)
 }
 
 const (
-	ErrInvalidEnvvarName  = Error("invalid environment variable name")
-	ErrInvalidMapItem     = Error("invalid map item")
-	ErrLookuperNil        = Error("lookuper cannot be nil")
-	ErrMissingKey         = Error("missing key")
-	ErrMissingRequired    = Error("missing required value")
-	ErrNoInitNotPtr       = Error("field must be a pointer to have noinit")
-	ErrNotPtr             = Error("input must be a pointer")
-	ErrNotStruct          = Error("input must be a struct")
-	ErrPrefixNotStruct    = Error("prefix is only valid on struct types")
-	ErrPrivateField       = Error("cannot parse private fields")
-	ErrRequiredAndDefault = Error("field cannot be required and have a default value")
-	ErrUnknownOption      = Error("unknown option")
+	ErrInvalidEnvvarName  = internalError("invalid environment variable name")
+	ErrInvalidMapItem     = internalError("invalid map item")
+	ErrLookuperNil        = internalError("lookuper cannot be nil")
+	ErrMissingKey         = internalError("missing key")
+	ErrMissingRequired    = internalError("missing required value")
+	ErrNoInitNotPtr       = internalError("field must be a pointer to have noinit")
+	ErrNotPtr             = internalError("input must be a pointer")
+	ErrNotStruct          = internalError("input must be a struct")
+	ErrPrefixNotStruct    = internalError("prefix is only valid on struct types")
+	ErrPrivateField       = internalError("cannot parse private fields")
+	ErrRequiredAndDefault = internalError("field cannot be required and have a default value")
+	ErrUnknownOption      = internalError("unknown option")
 )
 
 // Lookuper is an interface that provides a lookup for a string-based key.
@@ -195,14 +180,14 @@ func (p *prefixLookuper) Key(key string) string {
 
 func (p *prefixLookuper) Unwrap() Lookuper {
 	l := p.l
-	for v, ok := l.(UnwrappableLookuper); ok; {
+	for v, ok := l.(unwrappableLookuper); ok; {
 		l = v.Unwrap()
 	}
 	return l
 }
 
-// UnwrappableLookuper is a lookuper that can return the underlying lookuper.
-type UnwrappableLookuper interface {
+// unwrappableLookuper is a lookuper that can return the underlying lookuper.
+type unwrappableLookuper interface {
 	Unwrap() Lookuper
 }
 
@@ -212,9 +197,9 @@ func MultiLookuper(lookupers ...Lookuper) Lookuper {
 	return &multiLookuper{ls: lookupers}
 }
 
-// KeyedLookuper is an extension to the [Lookuper] interface that returns the
+// keyedLookuper is an extension to the [Lookuper] interface that returns the
 // underlying key (used by the [PrefixLookuper] or custom implementations).
-type KeyedLookuper interface {
+type keyedLookuper interface {
 	Key(key string) string
 }
 
@@ -244,7 +229,8 @@ type options struct {
 
 // Config represent inputs to the envconfig decoding.
 type Config struct {
-	// Target is the destination structure to decode. This value is required.
+	// Target is the destination structure to decode. This value is required, and
+	// it must be a pointer to a struct.
 	Target any
 
 	// Lookuper is the lookuper implementation to use. If not provided, it
@@ -282,8 +268,8 @@ type Config struct {
 	Mutators []Mutator
 }
 
-// Process processes the struct using the environment. See [ProcessWith] for a
-// more customizable version.
+// Process decodes the struct using values from environment variables. See
+// [ProcessWith] for a more customizable version.
 func Process(ctx context.Context, i any, mus ...Mutator) error {
 	return ProcessWith(ctx, &Config{
 		Target:   i,
@@ -291,14 +277,17 @@ func Process(ctx context.Context, i any, mus ...Mutator) error {
 	})
 }
 
-// ProcessWith processes the given interface with the given lookuper. See the
-// package-level documentation for specific examples and behaviors.
+// ProcessWith executes the decoding process using the provided [Config].
 func ProcessWith(ctx context.Context, c *Config) error {
 	if c == nil {
 		c = new(Config)
 	}
 
-	// Deep copy the slice and remove any nil functions.
+	if c.Lookuper == nil {
+		c.Lookuper = OsLookuper()
+	}
+
+	// Deep copy the slice and remove any nil mutators.
 	var mus []Mutator
 	for _, m := range c.Mutators {
 		if m != nil {
@@ -310,8 +299,7 @@ func ProcessWith(ctx context.Context, c *Config) error {
 	return processWith(ctx, c)
 }
 
-// processWith is a helper that captures whether the parent wanted
-// initialization.
+// processWith is a helper that retains configuration from the parent structs.
 func processWith(ctx context.Context, c *Config) error {
 	i := c.Target
 
@@ -513,7 +501,7 @@ func processWith(ctx context.Context, c *Config) error {
 		if found || usedDefault {
 			originalKey := key
 			resolvedKey := originalKey
-			if keyer, ok := l.(KeyedLookuper); ok {
+			if keyer, ok := l.(keyedLookuper); ok {
 				resolvedKey = keyer.Key(resolvedKey)
 			}
 			originalValue := val
@@ -620,7 +608,7 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 	val, found := l.Lookup(key)
 	if !found {
 		if required {
-			if keyer, ok := l.(KeyedLookuper); ok {
+			if keyer, ok := l.(keyedLookuper); ok {
 				key = keyer.Key(key)
 			}
 
@@ -632,7 +620,7 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 			// a different environment variable.
 			val = os.Expand(defaultValue, func(i string) string {
 				lookuper := l
-				if v, ok := lookuper.(UnwrappableLookuper); ok {
+				if v, ok := lookuper.(unwrappableLookuper); ok {
 					lookuper = v.Unwrap()
 				}
 
