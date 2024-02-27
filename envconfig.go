@@ -266,6 +266,11 @@ type Config struct {
 
 	// Mutators is an optional list of mutators to apply to lookups.
 	Mutators []Mutator
+
+	// KeepPrefixExpansion specifies if prefixes are removed when expanding default
+	// values that reference other environment variables. Set to true to keep any
+	// prefix.
+	KeepPrefixExpansion bool
 }
 
 // Process decodes the struct using values from environment variables. See
@@ -335,6 +340,8 @@ func processWith(ctx context.Context, c *Config) error {
 	structOverwrite := c.DefaultOverwrite
 	structDecodeUnset := c.DefaultDecodeUnset
 	structRequired := c.DefaultRequired
+
+	unwrapOnExpand := !c.KeepPrefixExpansion
 
 	mutators := c.Mutators
 
@@ -428,7 +435,7 @@ func processWith(ctx context.Context, c *Config) error {
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+			val, found, usedDefault, err := lookup(key, required, opts.Default, unwrapOnExpand, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
@@ -483,7 +490,7 @@ func processWith(ctx context.Context, c *Config) error {
 			continue
 		}
 
-		val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+		val, found, usedDefault, err := lookup(key, required, opts.Default, unwrapOnExpand, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
@@ -591,7 +598,7 @@ LOOP:
 // first boolean parameter indicates whether the value was found in the
 // lookuper. The second boolean parameter indicates whether the default value
 // was used.
-func lookup(key string, required bool, defaultValue string, l Lookuper) (string, bool, bool, error) {
+func lookup(key string, required bool, defaultValue string, unwrapOnExpand bool, l Lookuper) (string, bool, bool, error) {
 	if key == "" {
 		// The struct has something like `env:",required"`, which is likely a
 		// mistake. We could try to infer the envvar from the field name, but that
@@ -620,7 +627,7 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 			// a different environment variable.
 			val = os.Expand(defaultValue, func(i string) string {
 				lookuper := l
-				if v, ok := lookuper.(unwrappableLookuper); ok {
+				if v, ok := lookuper.(unwrappableLookuper); ok && unwrapOnExpand {
 					lookuper = v.Unwrap()
 				}
 

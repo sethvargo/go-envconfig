@@ -233,19 +233,20 @@ func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name           string
-		target         any
-		lookuper       Lookuper
-		defDelimiter   string
-		defSeparator   string
-		defNoInit      bool
-		defOverwrite   bool
-		defDecodeUnset bool
-		defRequired    bool
-		mutators       []Mutator
-		exp            any
-		err            error
-		errMsg         string
+		name             string
+		target           any
+		lookuper         Lookuper
+		defDelimiter     string
+		defSeparator     string
+		defNoInit        bool
+		defOverwrite     bool
+		defDecodeUnset   bool
+		defRequired      bool
+		keepPrefixExpand bool
+		mutators         []Mutator
+		exp              any
+		err              error
+		errMsg           string
 	}{
 		// nil pointer
 		{
@@ -1310,6 +1311,36 @@ func TestProcessWith(t *testing.T) {
 				//
 				"DEFAULT": "value",
 			}))),
+		},
+		{
+			name: "default/expand_keep_prefix",
+			target: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "value",
+			},
+			lookuper: PrefixLookuper("PREFIX_", MapLookuper(map[string]string{
+				"PREFIX_DEFAULT": "value",
+			})),
+			keepPrefixExpand: true,
+		},
+		{
+			name: "default/expand_keep_prefix_prefix",
+			target: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "value",
+			},
+			lookuper: PrefixLookuper("OUTER_", PrefixLookuper("INNER_", MapLookuper(map[string]string{
+				"INNER_OUTER_DEFAULT": "value",
+			}))),
+			keepPrefixExpand: true,
 		},
 		{
 			name: "default/slice",
@@ -2873,15 +2904,16 @@ func TestProcessWith(t *testing.T) {
 
 			ctx := context.Background()
 			if err := ProcessWith(ctx, &Config{
-				Target:             tc.target,
-				Lookuper:           tc.lookuper,
-				DefaultDelimiter:   tc.defDelimiter,
-				DefaultSeparator:   tc.defSeparator,
-				DefaultNoInit:      tc.defNoInit,
-				DefaultOverwrite:   tc.defOverwrite,
-				DefaultDecodeUnset: tc.defDecodeUnset,
-				DefaultRequired:    tc.defRequired,
-				Mutators:           tc.mutators,
+				Target:              tc.target,
+				Lookuper:            tc.lookuper,
+				DefaultDelimiter:    tc.defDelimiter,
+				DefaultSeparator:    tc.defSeparator,
+				DefaultNoInit:       tc.defNoInit,
+				DefaultOverwrite:    tc.defOverwrite,
+				DefaultDecodeUnset:  tc.defDecodeUnset,
+				DefaultRequired:     tc.defRequired,
+				KeepPrefixExpansion: tc.keepPrefixExpand,
+				Mutators:            tc.mutators,
 			}); err != nil {
 				if tc.err == nil && tc.errMsg == "" {
 					t.Fatal(err)
