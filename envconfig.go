@@ -15,7 +15,7 @@
 // Package envconfig populates struct fields based on environment variable
 // values (or anything that responds to "Lookup"). Structs declare their
 // environment dependencies using the "env" tag with the key being the name of
-// the environment variable, case sensitive.
+// the environment variable, case-sensitive.
 //
 //	type MyStruct struct {
 //	  A string `env:"A"` // resolves A to $A
@@ -264,7 +264,7 @@ type Config struct {
 	// default value is false.
 	DefaultRequired bool
 
-	// Mutators is an optiona list of mutators to apply to lookups.
+	// Mutators is an optional list of mutators to apply to lookups.
 	Mutators []Mutator
 }
 
@@ -839,13 +839,13 @@ func validateEnvName(s string) bool {
 }
 
 // isLetter returns true if the given rune is a letter between a-z,A-Z. This is
-// different than unicode.IsLetter which includes all L character cases.
+// different from unicode.IsLetter which includes all L character cases.
 func isLetter(r rune) bool {
 	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 }
 
 // isNumber returns true if the given run is a number between 0-9. This is
-// different than unicode.IsNumber in that it only allows 0-9.
+// different from unicode.IsNumber in that it only allows 0-9.
 func isNumber(r rune) bool {
 	return r >= '0' && r <= '9'
 }
