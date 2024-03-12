@@ -289,7 +289,8 @@ lookuper := envconfig.MapLookuper(map[string]string{
 })
 
 var config Config
-envconfig.ProcessWith(ctx, &config, &envconfig.Config{
+envconfig.ProcessWith(ctx, &envconfig.Config{
+  Target:   &config,
   Lookuper: lookuper,
 })
 ```
