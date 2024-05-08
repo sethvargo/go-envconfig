@@ -78,6 +78,15 @@ examples.
     }
     ```
 
+-   `notempty` - marks a field as required to be not empty. If a field is required to be not empty, decoding
+    will error if the environment variable is not set or is set to an empty string.
+
+    ```go
+    type MyStruct struct {
+      Port string `env:"PORT, notempty"`
+    }
+    ```
+
 -   `default` - sets the default value for the environment variable is not set.
     The environment variable must not be set (e.g. `unset PORT`). If the
     environment variable is the empty string, envconfig considers that a "value"

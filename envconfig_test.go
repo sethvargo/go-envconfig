@@ -1061,6 +1061,46 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 
+		// NotEmpty
+		{
+			name: "notempty/empty",
+			target: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			err: ErrEmptyValue,
+		},
+		{
+			name: "notempty/notempty",
+			target: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{
+				Field: "foobar",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foobar",
+			}),
+		},
+		{
+			name: "notempty/notempty-default",
+			target: &struct {
+				Field string `env:"FIELD,notempty,default=bar"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,notempty,default=bar"`
+			}{},
+			lookuper: MapLookuper(nil),
+			err:      ErrRequiredAndDefault,
+		},
+
 		// Required
 		{
 			name: "required/present",

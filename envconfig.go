@@ -74,6 +74,7 @@ const (
 	optOverwrite   = "overwrite"
 	optPrefix      = "prefix="
 	optRequired    = "required"
+	optNotEmpty    = "notempty"
 	optSeparator   = "separator="
 )
 
@@ -91,6 +92,7 @@ const (
 	ErrLookuperNil        = internalError("lookuper cannot be nil")
 	ErrMissingKey         = internalError("missing key")
 	ErrMissingRequired    = internalError("missing required value")
+	ErrEmptyValue         = internalError("empty value")
 	ErrNoInitNotPtr       = internalError("field must be a pointer to have noinit")
 	ErrNotPtr             = internalError("input must be a pointer")
 	ErrNotStruct          = internalError("input must be a struct")
@@ -225,6 +227,7 @@ type options struct {
 	Overwrite   bool
 	DecodeUnset bool
 	Required    bool
+	NotEmpty    bool
 }
 
 // Config represent inputs to the envconfig decoding.
@@ -428,7 +431,7 @@ func processWith(ctx context.Context, c *Config) error {
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+			val, found, usedDefault, err := lookup(key, required, opts.NotEmpty, opts.Default, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
@@ -483,7 +486,7 @@ func processWith(ctx context.Context, c *Config) error {
 			continue
 		}
 
-		val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+		val, found, usedDefault, err := lookup(key, required, opts.NotEmpty, opts.Default, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
@@ -565,6 +568,8 @@ LOOP:
 			opts.Overwrite = true
 		case search == optRequired:
 			opts.Required = true
+		case search == optNotEmpty:
+			opts.NotEmpty = true
 		case search == optNoInit:
 			opts.NoInit = true
 		case strings.HasPrefix(search, optPrefix):
@@ -591,7 +596,7 @@ LOOP:
 // first boolean parameter indicates whether the value was found in the
 // lookuper. The second boolean parameter indicates whether the default value
 // was used.
-func lookup(key string, required bool, defaultValue string, l Lookuper) (string, bool, bool, error) {
+func lookup(key string, required bool, notEmpty bool, defaultValue string, l Lookuper) (string, bool, bool, error) {
 	if key == "" {
 		// The struct has something like `env:",required"`, which is likely a
 		// mistake. We could try to infer the envvar from the field name, but that
@@ -599,7 +604,7 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 		return "", false, false, ErrMissingKey
 	}
 
-	if required && defaultValue != "" {
+	if (required || notEmpty) && defaultValue != "" {
 		// Having a default value on a required value doesn't make sense.
 		return "", false, false, ErrRequiredAndDefault
 	}
@@ -633,6 +638,10 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 
 			return val, false, true, nil
 		}
+	}
+
+	if notEmpty && val == "" {
+		return "", false, false, fmt.Errorf("%w: %s", ErrEmptyValue, key)
 	}
 
 	return val, found, false, nil
