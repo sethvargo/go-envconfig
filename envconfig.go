@@ -264,13 +264,18 @@ type Config struct {
 	// default value is false.
 	DefaultRequired bool
 
-	// Mutators is an optiona list of mutators to apply to lookups.
+	// Mutators is an optional list of mutators to apply to lookups.
 	Mutators []Mutator
 }
 
 // Process decodes the struct using values from environment variables. See
-// [ProcessWith] for a more customizable version.
+// [ProcessWith] for a more customizable version. If *Config is provided for i,
+// [ProcessWith] is called using the *Config with mus appended.
 func Process(ctx context.Context, i any, mus ...Mutator) error {
+	if v, ok := i.(*Config); ok {
+		v.Mutators = append(v.Mutators, mus...)
+		return ProcessWith(ctx, v)
+	}
 	return ProcessWith(ctx, &Config{
 		Target:   i,
 		Mutators: mus,
@@ -529,7 +534,7 @@ func processWith(ctx context.Context, c *Config) error {
 
 // SplitString splits the given string on the provided rune, unless the rune is
 // escaped by the escape character.
-func splitString(s string, on string, esc string) []string {
+func splitString(s, on, esc string) []string {
 	a := strings.Split(s, on)
 
 	for i := len(a) - 2; i >= 0; i-- {

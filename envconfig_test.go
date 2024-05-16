@@ -229,6 +229,45 @@ type MapStruct struct {
 
 type Base64ByteSlice []Base64Bytes
 
+func TestProcessWithConfigArgument(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	lookuper := MapLookuper(map[string]string{
+		"MEAT_TYPE": "chicken",
+	})
+
+	firstMutator := MutatorFunc(func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
+		if originalKey == "MEAT_TYPE" && currentValue == "chicken" {
+			return "pork", false, nil
+		}
+		return currentValue, false, nil
+	})
+
+	secondMutator := MutatorFunc(func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
+		if originalKey == "MEAT_TYPE" && currentValue == "pork" {
+			return "fish", false, nil
+		}
+		return currentValue, false, nil
+	})
+
+	var meatConfig Meat
+	cfg := &Config{
+		Target:   &meatConfig,
+		Lookuper: lookuper,
+		Mutators: []Mutator{firstMutator},
+	}
+
+	err := Process(ctx, cfg, secondMutator)
+	if err != nil {
+		t.Errorf("unexpected error from Process: %s", err.Error())
+	}
+
+	if diff := cmp.Diff(meatConfig.Type, "fish"); diff != "" {
+		t.Errorf("wrong value in meatConfig. Diff (-got +want): %s", diff)
+	}
+}
+
 func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
