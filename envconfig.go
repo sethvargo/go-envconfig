@@ -269,8 +269,11 @@ type Config struct {
 }
 
 // Process decodes the struct using values from environment variables. See
-// [ProcessWith] for a more customizable version. If *Config is provided for i,
-// [ProcessWith] is called using the *Config with mus appended.
+// [ProcessWith] for a more customizable version.
+//
+// As a special case, if the input for the target is a [*Config], then this
+// function will call [ProcessWith] using the provided config, with any mutation
+// appended.
 func Process(ctx context.Context, i any, mus ...Mutator) error {
 	if v, ok := i.(*Config); ok {
 		v.Mutators = append(v.Mutators, mus...)
