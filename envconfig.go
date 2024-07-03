@@ -285,6 +285,15 @@ func Process(ctx context.Context, i any, mus ...Mutator) error {
 	})
 }
 
+// MustProcess is a helper that calls [Process] and panics if an error is
+// encountered. The input value is returned after processing.
+func MustProcess[T any](ctx context.Context, i T, mus ...Mutator) T {
+	if err := Process(ctx, i, mus...); err != nil {
+		panic(err)
+	}
+	return i
+}
+
 // ProcessWith executes the decoding process using the provided [Config].
 func ProcessWith(ctx context.Context, c *Config) error {
 	if c == nil {

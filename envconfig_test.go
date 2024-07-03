@@ -3034,3 +3034,25 @@ func TestValidateEnvName(t *testing.T) {
 func ptrTo[T any](i T) *T {
 	return &i
 }
+
+func TestMustProcess_Panic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected a panic")
+		}
+	}()
+	MustProcess(context.Background(), struct {
+		Unset string `env:"UNSET" required:"true"`
+	}{})
+}
+
+func TestMustProcess_Value(t *testing.T) {
+	t.Setenv("SET", "value")
+	s := MustProcess(context.Background(), &struct {
+		Set string `env:"SET"`
+	}{})
+
+	if s.Set != "value" {
+		t.Fatalf("expected %q to be %q", s.Set, "value")
+	}
+}
