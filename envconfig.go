@@ -285,6 +285,24 @@ func Process(ctx context.Context, i any, mus ...Mutator) error {
 	})
 }
 
+// MustProcess is a helper that calls [Process] and panics if an error is
+// encountered. Unlike [Process], the input value is returned, making it ideal
+// for anonymous initializations:
+//
+//	var env = envconfig.MustProcess(context.Background(), &struct{
+//	  Field string `env:"FIELD,required"`
+//	})
+//
+// This is not recommend for production services, but it can be useful for quick
+// CLIs and scripts that want to take advantage of envconfig's environment
+// parsing at the expense of testability and graceful error handling.
+func MustProcess[T any](ctx context.Context, i T, mus ...Mutator) T {
+	if err := Process(ctx, i, mus...); err != nil {
+		panic(err)
+	}
+	return i
+}
+
 // ProcessWith executes the decoding process using the provided [Config].
 func ProcessWith(ctx context.Context, c *Config) error {
 	if c == nil {
