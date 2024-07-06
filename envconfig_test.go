@@ -2958,6 +2958,71 @@ func TestProcessWith(t *testing.T) {
 	}
 }
 
+func TestMustProcess(t *testing.T) {
+	cases := []struct {
+		name     string
+		target   any
+		exp      any
+		env      map[string]string
+		expPanic bool
+	}{
+		{
+			name: "panics_on_error",
+			target: &struct {
+				Field string `env:"FIELD,required"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,required"`
+			}{},
+			env:      nil,
+			expPanic: true,
+		},
+		{
+			name: "returns_value",
+			target: &struct {
+				Field string `env:"FIELD,required"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,required"`
+			}{
+				Field: "value",
+			},
+			env: map[string]string{
+				"FIELD": "value",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+
+			defer func() {
+				if r := recover(); r != nil {
+					if !tc.expPanic {
+						t.Fatal(r)
+					}
+				} else if tc.expPanic {
+					t.Errorf("expected a panic")
+				}
+			}()
+
+			ctx := context.Background()
+			got := MustProcess(ctx, tc.target)
+
+			if got != tc.target {
+				t.Errorf("expected result to be the same object as target (%#v, %#v)", got, tc.target)
+			}
+
+			if diff := cmp.Diff(tc.exp, tc.target); diff != "" {
+				t.Fatalf("mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidateEnvName(t *testing.T) {
 	t.Parallel()
 
@@ -3033,26 +3098,4 @@ func TestValidateEnvName(t *testing.T) {
 
 func ptrTo[T any](i T) *T {
 	return &i
-}
-
-func TestMustProcess_Panic(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected a panic")
-		}
-	}()
-	MustProcess(context.Background(), struct {
-		Unset string `env:"UNSET" required:"true"`
-	}{})
-}
-
-func TestMustProcess_Value(t *testing.T) {
-	t.Setenv("SET", "value")
-	s := MustProcess(context.Background(), &struct {
-		Set string `env:"SET"`
-	}{})
-
-	if s.Set != "value" {
-		t.Fatalf("expected %q to be %q", s.Set, "value")
-	}
 }
