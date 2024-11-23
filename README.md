@@ -93,6 +93,20 @@ examples.
     }
     ```
 
+-   `default.raw` - sets a literal default value for the environment variable
+    if it is not set, without applying any transformations or expansions.
+    This allows for exact values to be used, including special characters. 
+    This option ensures that the exact value provided in the `default.raw` tag is used.
+
+    ```go
+    type MyStruct struct {
+      Token string `env:"TOKEN, default.raw=this^will$be&used|as-is"`
+    }
+    ```
+
+    If the `PORT` environment variable is unset, the field `Port` will be assigned the literal value `expand^makes$no&problems`, without interpreting `$no` or other special characters.
+    
+
 -   `prefix` - sets the prefix to use for looking up environment variable keys
     on child structs and fields. This is useful for shared configurations:
 
