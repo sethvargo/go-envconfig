@@ -75,6 +75,7 @@ const (
 	optPrefix      = "prefix="
 	optRequired    = "required"
 	optSeparator   = "separator="
+	optLiteral     = "default.raw="
 )
 
 // internalError is a custom error type for errors returned by envconfig.
@@ -225,6 +226,7 @@ type options struct {
 	Overwrite   bool
 	DecodeUnset bool
 	Required    bool
+	Literal     bool
 }
 
 // Config represent inputs to the envconfig decoding.
@@ -436,7 +438,7 @@ func processWith(ctx context.Context, c *Config) error {
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+			val, found, usedDefault, err := lookup(key, required, opts.Default, opts.Literal, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
@@ -491,7 +493,7 @@ func processWith(ctx context.Context, c *Config) error {
 			continue
 		}
 
-		val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+		val, found, usedDefault, err := lookup(key, required, opts.Default, opts.Literal, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
@@ -581,9 +583,15 @@ LOOP:
 			opts.Delimiter = strings.TrimPrefix(o, optDelimiter)
 		case strings.HasPrefix(search, optSeparator):
 			opts.Separator = strings.TrimPrefix(o, optSeparator)
+		case strings.HasPrefix(search, optLiteral):
+			opts.Literal = true
+			o = strings.TrimLeft(strings.Join(tagOpts[i:], ","), " ")
+			// Use opts.Default for the literal value. No need for a new string option.
+			opts.Default = strings.TrimPrefix(o, optDefault)
+			break LOOP
 		case strings.HasPrefix(search, optDefault):
 			// If a default value was given, assume everything after is the provided
-			// value, including comma-seprated items.
+			// value, including comma-separated items.
 			o = strings.TrimLeft(strings.Join(tagOpts[i:], ","), " ")
 			opts.Default = strings.TrimPrefix(o, optDefault)
 			break LOOP
@@ -599,7 +607,7 @@ LOOP:
 // first boolean parameter indicates whether the value was found in the
 // lookuper. The second boolean parameter indicates whether the default value
 // was used.
-func lookup(key string, required bool, defaultValue string, l Lookuper) (string, bool, bool, error) {
+func lookup(key string, required bool, defaultValue string, literal bool, l Lookuper) (string, bool, bool, error) {
 	if key == "" {
 		// The struct has something like `env:",required"`, which is likely a
 		// mistake. We could try to infer the envvar from the field name, but that
@@ -624,7 +632,19 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 		}
 
 		if defaultValue != "" {
-			// Expand the default value. This allows for a default value that maps to
+			if literal {
+				// If the "literal" option is set, the default value is treated as-is
+				// without any modification or expansion. This allows for exact values
+				// to be used, including special characters or reserved formatting.
+				// Here, we check if the defaultValue contains the literal prefix and
+				// extract the portion after the prefix.
+				parts := strings.Split(defaultValue, optLiteral)
+				if len(parts) > 1 {
+					return parts[1], false, true, nil
+				}
+			}
+			// If literal option is not set, we can expand the default value.
+			// This allows for a default value that maps to
 			// a different environment variable.
 			val = os.Expand(defaultValue, func(i string) string {
 				lookuper := l

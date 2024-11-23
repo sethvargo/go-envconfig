@@ -110,7 +110,9 @@ func Example_defaults() {
 
 	type MyStruct struct {
 		Port     int    `env:"PORT, default=8080"`
-		Username string `env:"USERNAME, default=$OTHER_ENV"`
+		Username string `env:"USERNAME, default=$OTHER_ENV"`              // expands to empty
+		ApiKey   string `env:"API_KEY, default=expand^makes$no&problems"` // $no expands to empty without .raw
+		Secret   string `env:"SECRET, default.raw=expand^makes$no&problems|i,hope|!@#$%^&*()_+~{}[]:;,.<>?/|\\"`
 	}
 
 	var s MyStruct
@@ -119,9 +121,15 @@ func Example_defaults() {
 	}
 
 	fmt.Printf("port: %d\n", s.Port)
+	fmt.Printf("username: [%s]\n", s.Username) // for empty brackets
+	fmt.Printf("api-key: %s\n", s.ApiKey)
+	fmt.Printf("secret: %s\n", s.Secret)
 
 	// Output:
 	// port: 8080
+	// username: []
+	// api-key: expand^makes&problems
+	// secret: expand^makes$no&problems|i,hope|!@#$%^&*()_+~{}[]:;,.<>?/|\
 }
 
 func Example_prefix() {
