@@ -104,9 +104,6 @@ examples.
     }
     ```
 
-    If the `PORT` environment variable is unset, the field `Port` will be assigned the literal value `expand^makes$no&problems`, without interpreting `$no` or other special characters.
-    
-
 -   `prefix` - sets the prefix to use for looking up environment variable keys
     on child structs and fields. This is useful for shared configurations:
 
