@@ -856,7 +856,7 @@ func validateEnvName(s string) bool {
 	}
 
 	for i, r := range s {
-		if (i == 0 && !isLetter(r)) || (!isLetter(r) && !isNumber(r) && r != '_') {
+		if (i == 0 && !isLetter(r) && r != '_') || (!isLetter(r) && !isNumber(r) && r != '_') {
 			return false
 		}
 	}

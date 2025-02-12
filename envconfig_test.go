@@ -3072,6 +3072,11 @@ func TestValidateEnvName(t *testing.T) {
 			exp:  true,
 		},
 		{
+			name: "underscore_start",
+			in:   "_foo",
+			exp:  true,
+		},
+		{
 			name: "emoji_middle",
 			in:   "FOO🚀",
 			exp:  false,
