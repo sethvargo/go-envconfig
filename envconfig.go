@@ -546,7 +546,7 @@ func processWith(ctx context.Context, c *Config) error {
 
 		// Set value.
 		if err := processField(val, ef, delimiter, separator, noInit); err != nil {
-			return fmt.Errorf("%s(%q): %w", tf.Name, val, err)
+			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
 	}
 
