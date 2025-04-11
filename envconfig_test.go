@@ -1351,6 +1351,34 @@ func TestProcessWith(t *testing.T) {
 			}))),
 		},
 		{
+			name: "default/escaped_doesnt_interpolate",
+			target: &struct {
+				Field string `env:"FIELD,default=\\$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=\\$DEFAULT"`
+			}{
+				Field: "$DEFAULT",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"DEFAULT": "should-not-be-replaced",
+			}),
+		},
+		{
+			name: "default/escaped_escaped_keeps_escape",
+			target: &struct {
+				Field string `env:"FIELD,default=C:\\Personal\\\\$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=C:\\Personal\\\\$DEFAULT"`
+			}{
+				Field: `C:\Personal\value`,
+			},
+			lookuper: MapLookuper(map[string]string{
+				"DEFAULT": "value",
+			}),
+		},
+		{
 			name: "default/slice",
 			target: &struct {
 				Field []string `env:"FIELD,default=foo,bar,baz"`

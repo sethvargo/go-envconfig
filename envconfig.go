@@ -642,6 +642,18 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 		}
 
 		if defaultValue != "" {
+			// Handle escaped "$" by replacing the value with a character that is
+			// invalid to have in an environment variable. A more perfect solution
+			// would be to re-implement os.Expand to handle this case, but that's been
+			// proposed and rejected in the stdlib. Additionally, the function is
+			// dependent on other private functions in the [os] package, so
+			// duplicating it is toilsome.
+			//
+			// While admittidly a hack, replacing the escaped values with invalid
+			// characters (and then replacing later), is a reasonable solution.
+			defaultValue = strings.ReplaceAll(defaultValue, "\\\\", "\u0000")
+			defaultValue = strings.ReplaceAll(defaultValue, "\\$", "\u0008")
+
 			// Expand the default value. This allows for a default value that maps to
 			// a different environment variable.
 			val = os.Expand(defaultValue, func(i string) string {
@@ -656,6 +668,9 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 				}
 				return ""
 			})
+
+			val = strings.ReplaceAll(val, "\u0000", "\\")
+			val = strings.ReplaceAll(val, "\u0008", "$")
 
 			return val, false, true, nil
 		}
