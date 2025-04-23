@@ -108,6 +108,17 @@ type Lookuper interface {
 	Lookup(key string) (string, bool)
 }
 
+var _ Lookuper = (LookuperFunc)(nil)
+
+// LookuperFunc implements the [Lookuper] interface and provides a quick way to
+// create an anonymous function that performs a lookup for a string-based key.
+type LookuperFunc func(key string) (string, bool)
+
+// Lookup implements [Lookuper].
+func (l LookuperFunc) Lookup(key string) (string, bool) {
+	return l(key)
+}
+
 // osLookuper looks up environment configuration from the local environment.
 type osLookuper struct{}
 
