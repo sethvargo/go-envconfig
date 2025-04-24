@@ -2930,6 +2930,70 @@ func TestProcessWith(t *testing.T) {
 				"FIELD": "foo bar,zip:zap zoo:zil",
 			}),
 		},
+		// LookuperFunc
+		{
+			name: "lookuperfunc/static",
+			target: &struct {
+				Field1 string `env:"FIELD1"`
+				Field2 string `env:"FIELD2"`
+			}{},
+			lookuper: LookuperFunc(func(key string) (string, bool) {
+				return "foo", true
+			}),
+			exp: &struct {
+				Field1 string `env:"FIELD1"`
+				Field2 string `env:"FIELD2"`
+			}{
+				Field1: "foo",
+				Field2: "foo",
+			},
+		},
+		{
+			name: "lookuperfunc/branching",
+			target: &struct {
+				Field1 string `env:"FIELD1"`
+				Field2 string `env:"FIELD2"`
+			}{},
+			lookuper: LookuperFunc(func(key string) (string, bool) {
+				if key == "FIELD1" {
+					return "foo", true
+				}
+				return "", false
+			}),
+			exp: &struct {
+				Field1 string `env:"FIELD1"`
+				Field2 string `env:"FIELD2"`
+			}{
+				Field1: "foo",
+				Field2: "",
+			},
+		},
+		{
+			name: "lookuperfunc/switching",
+			target: &struct {
+				Field1 string `env:"FIELD1"`
+				Field2 string `env:"FIELD2"`
+				Field3 string `env:"FIELD3"`
+			}{},
+			lookuper: LookuperFunc(func(key string) (string, bool) {
+				switch key {
+				case "FIELD1":
+					return "foo", true
+				case "FIELD2":
+					return "bar", true
+				}
+				return "", false
+			}),
+			exp: &struct {
+				Field1 string `env:"FIELD1"`
+				Field2 string `env:"FIELD2"`
+				Field3 string `env:"FIELD3"`
+			}{
+				Field1: "foo",
+				Field2: "bar",
+				Field3: "",
+			},
+		},
 	}
 
 	for _, tc := range cases {
