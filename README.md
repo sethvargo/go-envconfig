@@ -290,8 +290,21 @@ the non-nil value. To change this behavior, see
 
 ### Custom Decoders
 
-You can also define your own decoders. See the [godoc][godoc] for more
-information.
+You can also define your own decoders.
+
+```go
+type MyCustomType struct {
+  value string
+}
+
+func (t *MyCustomType) EnvDecode(ctx context.Context, val string) error {
+  resolved := someComplexFunction(val)
+  t.value = resolved
+  return nil
+}
+```
+
+See the [godoc][godoc] for more information.
 
 
 ## Testing
