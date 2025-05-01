@@ -31,14 +31,26 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var _ Decoder = (*CustomDecoderType)(nil)
+var _ DecoderCtx = (*CustomDecoderType)(nil)
 
 // CustomDecoderType is used to test custom decoding using Decoder.
 type CustomDecoderType struct {
 	value string
 }
 
-func (c *CustomDecoderType) EnvDecode(val string) error {
+func (c *CustomDecoderType) EnvDecode(ctx context.Context, val string) error {
+	c.value = "CUSTOM-" + val
+	return nil
+}
+
+var _ Decoder = (*CustomDecoderTypeLegacy)(nil)
+
+// CustomDecoderTypeLegacy is used to test custom decoding using Decoder.
+type CustomDecoderTypeLegacy struct {
+	value string
+}
+
+func (c *CustomDecoderTypeLegacy) EnvDecode(val string) error {
 	c.value = "CUSTOM-" + val
 	return nil
 }
@@ -1431,6 +1443,14 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "syntax/=key",
 			target: &struct {
+				Field CustomDecoderTypeLegacy `env:"FIELD=foo"`
+			}{},
+			lookuper: MapLookuper(nil),
+			err:      ErrInvalidEnvvarName,
+		},
+		{
+			name: "syntax/=key",
+			target: &struct {
 				Field CustomDecoderType `env:"FIELD=foo"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -1613,6 +1633,98 @@ func TestProcessWith(t *testing.T) {
 				Field *CustomDecoderType `env:"FIELD, decodeunset"`
 			}{
 				Field: &CustomDecoderType{
+					value: "CUSTOM-",
+				},
+			},
+			lookuper: MapLookuper(nil),
+		},
+
+		// Custom decoder - legacy
+		{
+			name: "custom_decoder/struct",
+			target: &struct {
+				Field CustomDecoderTypeLegacy `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field CustomDecoderTypeLegacy `env:"FIELD"`
+			}{
+				Field: CustomDecoderTypeLegacy{
+					value: "CUSTOM-foo",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "custom_decoder/pointer",
+			target: &struct {
+				Field *CustomDecoderTypeLegacy `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *CustomDecoderTypeLegacy `env:"FIELD"`
+			}{
+				Field: &CustomDecoderTypeLegacy{
+					value: "CUSTOM-foo",
+				},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "custom_decoder/private",
+			target: &struct {
+				field *CustomDecoderTypeLegacy `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+			err: ErrPrivateField,
+		},
+		{
+			name: "custom_decoder/error",
+			target: &struct {
+				Field CustomTypeError `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+			errMsg: "broken",
+		},
+		{
+			name: "custom_decoder/called_for_empty_string",
+			target: &struct {
+				Field CustomTypeError `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			errMsg: "broken",
+		},
+		{
+			name: "custom_decoder/called_when_default",
+			target: &struct {
+				Field *CustomDecoderTypeLegacy `env:"FIELD, default=foo"`
+			}{},
+			exp: &struct {
+				Field *CustomDecoderTypeLegacy `env:"FIELD, default=foo"`
+			}{
+				Field: &CustomDecoderTypeLegacy{
+					value: "CUSTOM-foo",
+				},
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "custom_decoder/called_on_decodeunset",
+			target: &struct {
+				Field *CustomDecoderTypeLegacy `env:"FIELD, decodeunset"`
+			}{},
+			exp: &struct {
+				Field *CustomDecoderTypeLegacy `env:"FIELD, decodeunset"`
+			}{
+				Field: &CustomDecoderTypeLegacy{
 					value: "CUSTOM-",
 				},
 			},
@@ -3033,6 +3145,9 @@ func TestProcessWith(t *testing.T) {
 			opts := cmp.AllowUnexported(
 				// Custom decoder type
 				CustomDecoderType{},
+
+				// Custom decoder type - legacy
+				CustomDecoderTypeLegacy{},
 
 				// Custom standard library interfaces decoder type
 				CustomStdLibDecodingType{},
