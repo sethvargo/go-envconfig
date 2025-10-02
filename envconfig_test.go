@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -3310,4 +3311,194 @@ func TestValidateEnvName(t *testing.T) {
 
 func ptrTo[T any](i T) *T {
 	return &i
+}
+
+func TestFileOption(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		target   any
+		lookuper Lookuper
+		exp      any
+		err      error
+		errMsg   string
+	}{
+		// Basic file reading
+		{
+			name: "file/basic",
+			target: &struct {
+				Field string `env:"FIELD,file"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,file"`
+			}{
+				Field: "I'm the content",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "test_file_content.txt",
+			}),
+		},
+		
+		// Empty file
+		{
+			name: "file/empty",
+			target: &struct {
+				Field string `env:"FIELD,file"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,file"`
+			}{
+				Field: "",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "test_empty_file.txt",
+			}),
+		},
+		
+		// Multiline file (should trim trailing newlines)
+		{
+			name: "file/multiline",
+			target: &struct {
+				Field string `env:"FIELD,file"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,file"`
+			}{
+				Field: "Line 1\nLine 2\nLine 3",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "test_multiline_file.txt",
+			}),
+		},
+		
+		// File not found error
+		{
+			name: "file/not_found",
+			target: &struct {
+				Field string `env:"FIELD,file"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "nonexistent_file.txt",
+			}),
+			errMsg: "failed to open file",
+		},
+		
+		// File option with required
+		{
+			name: "file/required",
+			target: &struct {
+				Field string `env:"FIELD,file,required"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,file,required"`
+			}{
+				Field: "I'm the content",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "test_file_content.txt",
+			}),
+		},
+		
+		// File option with required but missing env var
+		{
+			name: "file/required_missing",
+			target: &struct {
+				Field string `env:"FIELD,file,required"`
+			}{},
+			lookuper: MapLookuper(map[string]string{}),
+			errMsg:   "missing required value",
+		},
+		
+		// File option with empty env var (should not try to read file)
+		{
+			name: "file/empty_env_var",
+			target: &struct {
+				Field string `env:"FIELD,file"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,file"`
+			}{
+				Field: "",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+		},
+		
+		// File option with default value (when env var not set)
+		{
+			name: "file/with_default",
+			target: &struct {
+				Field string `env:"FIELD,file,default=test_file_content.txt"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,file,default=test_file_content.txt"`
+			}{
+				Field: "I'm the content",
+			},
+			lookuper: MapLookuper(map[string]string{}),
+		},
+		
+		// File option with different field types
+		{
+			name: "file/int_field",
+			target: &struct {
+				Field int `env:"FIELD,file"`
+			}{},
+			exp: &struct {
+				Field int `env:"FIELD,file"`
+			}{
+				Field: 42,
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "test_number_file.txt",
+			}),
+		},
+	}
+
+	// Create test files for the tests
+	testFiles := map[string]string{
+		"test_file_content.txt":    "I'm the content",
+		"test_empty_file.txt":      "",
+		"test_multiline_file.txt":  "Line 1\nLine 2\nLine 3",
+		"test_number_file.txt":     "42",
+	}
+	
+	for filename, content := range testFiles {
+		err := os.WriteFile(filename, []byte(content), 0644)
+		if err != nil {
+			t.Fatalf("failed to create test file %s: %v", filename, err)
+		}
+		defer os.Remove(filename)
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			err := ProcessWith(ctx, &Config{
+				Target:   tc.target,
+				Lookuper: tc.lookuper,
+			})
+
+			if tc.errMsg != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q", tc.errMsg)
+				}
+				if !strings.Contains(err.Error(), tc.errMsg) {
+					t.Fatalf("expected error containing %q, got %q", tc.errMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.exp, tc.target); diff != "" {
+				t.Fatalf("mismatch (-want, +got):\n%s", diff)
+			}
+		})
+	}
 }

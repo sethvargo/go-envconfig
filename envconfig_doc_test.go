@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -386,4 +387,49 @@ func Example_customConfiguration() {
 	// Output:
 	// allowed: map[header1:value1 header2:value2]
 	// rejected: map[header3:value3 header4:value4]
+}
+
+func Example_fileOption() {
+	// This example demonstrates how to use the "file" option to read
+	// configuration values from files. This is particularly useful for
+	// loading secrets or sensitive configuration data.
+
+	// Create temporary test files for the example
+	authFile := "example_auth_token.txt"
+	dbFile := "example_db_password.txt"
+	
+	os.WriteFile(authFile, []byte("secret-auth-token-123"), 0644)
+	os.WriteFile(dbFile, []byte("super-secret-db-password"), 0644)
+	defer os.Remove(authFile)
+	defer os.Remove(dbFile)
+
+	type Config struct {
+		// Read auth token from file path specified in AUTH_TOKEN_FILE
+		AuthToken string `env:"AUTH_TOKEN_FILE,file"`
+		
+		// Read database password from file, required
+		DBPassword string `env:"DB_PASSWORD_FILE,file,required"`
+	}
+
+	var config Config
+	if err := envconfig.ProcessWith(ctx, &envconfig.Config{
+		Target: &config,
+		Lookuper: envconfig.MapLookuper(map[string]string{
+			"AUTH_TOKEN_FILE":   authFile,
+			"DB_PASSWORD_FILE":  dbFile,
+		}),
+	}); err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("authtoken: %s\n", config.AuthToken)
+	fmt.Printf("dbpassword: %s\n", config.DBPassword)
+	
+	// Note: In real usage, you would set environment variables like:
+	//   export AUTH_TOKEN_FILE=/path/to/auth-token.txt
+	//   export DB_PASSWORD_FILE=/path/to/db-password.txt
+
+	// Output:
+	// authtoken: secret-auth-token-123
+	// dbpassword: super-secret-db-password
 }

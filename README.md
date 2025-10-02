@@ -204,6 +204,32 @@ examples.
     }
     ```
 
+-   `file` - read the environment variable value as a file path and load the
+    file's contents as the actual value. This is useful for loading secrets or
+    configuration from files.
+
+    ```go
+    type MyStruct struct {
+      AuthToken string `env:"AUTH_TOKEN_FILE, file"`
+    }
+    ```
+
+    With `AUTH_TOKEN_FILE=./secret.txt` and `secret.txt` containing `my-secret-token`,
+    the `AuthToken` field will be set to `my-secret-token`. Trailing newlines are
+    automatically trimmed from file contents.
+
+    The `file` option can be combined with other options:
+
+    ```go
+    type MyStruct struct {
+      // Required file path
+      AuthToken string `env:"AUTH_TOKEN_FILE, file, required"`
+      
+      // File with default path
+      Config string `env:"CONFIG_FILE, file, default=./config.txt"`
+    }
+    ```
+
 
 ## Decoding
 

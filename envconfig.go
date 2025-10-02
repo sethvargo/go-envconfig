@@ -56,6 +56,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strconv"
@@ -70,6 +71,7 @@ const (
 	optDecodeUnset = "decodeunset"
 	optDefault     = "default="
 	optDelimiter   = "delimiter="
+	optFile        = "file"
 	optNoInit      = "noinit"
 	optOverwrite   = "overwrite"
 	optPrefix      = "prefix="
@@ -239,6 +241,7 @@ type options struct {
 	Delimiter   string
 	Prefix      string
 	Separator   string
+	File        bool
 	NoInit      bool
 	Overwrite   bool
 	DecodeUnset bool
@@ -472,7 +475,7 @@ func processWith(ctx context.Context, c *Config) error {
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
-			val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+			val, found, usedDefault, err := lookup(key, required, opts.Default, opts.File, l)
 			if err != nil && !errors.Is(err, ErrMissingKey) {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
@@ -527,7 +530,7 @@ func processWith(ctx context.Context, c *Config) error {
 			continue
 		}
 
-		val, found, usedDefault, err := lookup(key, required, opts.Default, l)
+		val, found, usedDefault, err := lookup(key, required, opts.Default, opts.File, l)
 		if err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
@@ -605,6 +608,8 @@ LOOP:
 		switch {
 		case search == optDecodeUnset:
 			opts.DecodeUnset = true
+		case search == optFile:
+			opts.File = true
 		case search == optOverwrite:
 			opts.Overwrite = true
 		case search == optRequired:
@@ -635,7 +640,7 @@ LOOP:
 // first boolean parameter indicates whether the value was found in the
 // lookuper. The second boolean parameter indicates whether the default value
 // was used.
-func lookup(key string, required bool, defaultValue string, l Lookuper) (string, bool, bool, error) {
+func lookup(key string, required bool, defaultValue string, file bool, l Lookuper) (string, bool, bool, error) {
 	if key == "" {
 		// The struct has something like `env:",required"`, which is likely a
 		// mistake. We could try to infer the envvar from the field name, but that
@@ -690,11 +695,46 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 			val = strings.ReplaceAll(val, "\u0000", "\\")
 			val = strings.ReplaceAll(val, "\u0008", "$")
 
+			// If file option is set and we have a value from default, read the file content
+			if file && val != "" {
+				fileContent, err := readFileContent(val)
+				if err != nil {
+					return "", false, false, err
+				}
+				val = fileContent
+			}
+
 			return val, false, true, nil
 		}
 	}
 
+	// If file option is set and we found a value, read the file content
+	if file && val != "" {
+		fileContent, err := readFileContent(val)
+		if err != nil {
+			return "", false, false, err
+		}
+		val = fileContent
+	}
+
 	return val, found, false, nil
+}
+
+// readFileContent reads the content from a file path and trims trailing newlines.
+func readFileContent(filePath string) (string, error) {
+	fileContent, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file %q: %w", filePath, err)
+	}
+	defer fileContent.Close()
+	
+	content, err := io.ReadAll(fileContent)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file %q: %w", filePath, err)
+	}
+	
+	// Trim trailing newline which is common in files
+	return strings.TrimRight(string(content), "\r\n"), nil
 }
 
 // processAsDecoder processes the given value as a decoder or custom
