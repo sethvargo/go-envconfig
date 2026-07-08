@@ -191,7 +191,7 @@ func (p *prefixLookuper) Key(key string) string {
 
 func (p *prefixLookuper) Unwrap() Lookuper {
 	l := p.l
-	for v, ok := l.(unwrappableLookuper); ok; {
+	for v, ok := l.(unwrappableLookuper); ok; v, ok = l.(unwrappableLookuper) {
 		l = v.Unwrap()
 	}
 	return l
