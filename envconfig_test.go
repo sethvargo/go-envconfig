@@ -55,6 +55,25 @@ func (c *CustomDecoderTypeLegacy) EnvDecode(val string) error {
 	return nil
 }
 
+var (
+	_ Lookuper            = (*unwrappableTestLookuper)(nil)
+	_ unwrappableLookuper = (*unwrappableTestLookuper)(nil)
+)
+
+// unwrappableTestLookuper decorates another lookuper and exposes it via
+// Unwrap, like a custom decorating lookuper would.
+type unwrappableTestLookuper struct {
+	l Lookuper
+}
+
+func (u *unwrappableTestLookuper) Lookup(key string) (string, bool) {
+	return u.l.Lookup(key)
+}
+
+func (u *unwrappableTestLookuper) Unwrap() Lookuper {
+	return u.l
+}
+
 // Level mirrors Zap's level marshalling to reproduce an issue for tests.
 type Level int8
 
@@ -1361,6 +1380,28 @@ func TestProcessWith(t *testing.T) {
 				//
 				"DEFAULT": "value",
 			}))),
+		},
+		{
+			name: "default/expand_prefix_unwrappable",
+			target: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=$DEFAULT"`
+			}{
+				Field: "value",
+			},
+			lookuper: PrefixLookuper("PREFIX_", &unwrappableTestLookuper{
+				// Ensure the prefix lookuper's unwrap walk terminates when its
+				// child is itself unwrappable, and the default still resolves
+				// against the root MapLookuper:
+				//
+				//     https://github.com/sethvargo/go-envconfig/issues/135
+				//
+				l: MapLookuper(map[string]string{
+					"DEFAULT": "value",
+				}),
+			}),
 		},
 		{
 			name: "default/escaped_doesnt_interpolate",
@@ -3303,6 +3344,63 @@ func TestValidateEnvName(t *testing.T) {
 
 			if got, want := validateEnvName(tc.in), tc.exp; got != want {
 				t.Errorf("expected %q to be %t (got %t)", tc.in, want, got)
+			}
+		})
+	}
+}
+
+func TestPrefixLookuperUnwrap(t *testing.T) {
+	t.Parallel()
+
+	base := MapLookuper(map[string]string{"KEY": "value"})
+
+	cases := []struct {
+		name     string
+		lookuper Lookuper
+	}{
+		{
+			name:     "plain",
+			lookuper: PrefixLookuper("PREFIX_", base),
+		},
+		{
+			name:     "unwrappable",
+			lookuper: PrefixLookuper("PREFIX_", &unwrappableTestLookuper{l: base}),
+		},
+		{
+			name: "unwrappable_nested",
+			lookuper: PrefixLookuper("PREFIX_", &unwrappableTestLookuper{
+				l: &unwrappableTestLookuper{l: base},
+			}),
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Unwrap used to spin forever when the child lookuper was itself
+			// unwrappable, so run it under a watchdog to fail fast instead of
+			// hanging the suite on a regression:
+			//
+			//     https://github.com/sethvargo/go-envconfig/issues/135
+			//
+			unwrapped := make(chan Lookuper, 1)
+			go func() {
+				unwrapped <- tc.lookuper.(*prefixLookuper).Unwrap()
+			}()
+
+			select {
+			case got := <-unwrapped:
+				if _, ok := got.(unwrappableLookuper); ok {
+					t.Errorf("expected Unwrap to return the root lookuper, got the still-unwrappable %T", got)
+				}
+				if v, ok := got.Lookup("KEY"); !ok || v != "value" {
+					t.Errorf("expected the root lookuper to resolve KEY (got %q, %t)", v, ok)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("Unwrap did not terminate")
 			}
 		})
 	}
