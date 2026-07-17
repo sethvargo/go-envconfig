@@ -16,9 +16,9 @@ jobs:
     runs-on: 'ubuntu-latest'
 
     steps:
-      - uses: 'actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11' # ratchet:actions/checkout@v4
+      - uses: 'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0' # ratchet:actions/checkout@v7
 
-      - uses: 'actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491' # ratchet:actions/setup-go@v5
+      - uses: 'actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e' # ratchet:actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
 
