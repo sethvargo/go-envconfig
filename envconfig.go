@@ -58,6 +58,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -335,14 +336,11 @@ func ProcessWith(ctx context.Context, c *Config) error {
 		c.Lookuper = OsLookuper()
 	}
 
-	// Deep copy the slice and remove any nil mutators.
-	var mus []Mutator
-	for _, m := range c.Mutators {
-		if m != nil {
-			mus = append(mus, m)
-		}
-	}
-	c.Mutators = mus
+	// Clone the slice (so we don't mutate the caller's) and drop any nil
+	// mutators.
+	c.Mutators = slices.DeleteFunc(slices.Clone(c.Mutators), func(m Mutator) bool {
+		return m == nil
+	})
 
 	return processWith(ctx, c)
 }
@@ -357,7 +355,7 @@ func processWith(ctx context.Context, c *Config) error {
 	}
 
 	v := reflect.ValueOf(i)
-	if v.Kind() != reflect.Ptr {
+	if v.Kind() != reflect.Pointer {
 		return ErrNotPtr
 	}
 
@@ -386,7 +384,7 @@ func processWith(ctx context.Context, c *Config) error {
 
 	mutators := c.Mutators
 
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		ef := e.Field(i)
 		tf := t.Field(i)
 		tag := tf.Tag.Get(envTag)
@@ -410,7 +408,7 @@ func processWith(ctx context.Context, c *Config) error {
 
 		// NoInit is only permitted on pointers.
 		if opts.NoInit &&
-			ef.Kind() != reflect.Ptr &&
+			ef.Kind() != reflect.Pointer &&
 			ef.Kind() != reflect.Slice &&
 			ef.Kind() != reflect.Map &&
 			ef.Kind() != reflect.UnsafePointer {
@@ -449,7 +447,7 @@ func processWith(ctx context.Context, c *Config) error {
 
 		// Initialize pointer structs.
 		pointerWasSet := false
-		for ef.Kind() == reflect.Ptr {
+		for ef.Kind() == reflect.Pointer {
 			if ef.IsNil() {
 				if ef.Type().Elem().Kind() != reflect.Struct {
 					// This is a nil pointer to something that isn't a struct, like
@@ -583,7 +581,7 @@ func splitString(s, on, esc string) []string {
 	for i := len(a) - 2; i >= 0; i-- {
 		if strings.HasSuffix(a[i], esc) {
 			a[i] = a[i][:len(a[i])-len(esc)] + on + a[i+1]
-			a = append(a[:i+1], a[i+2:]...)
+			a = slices.Delete(a, i+1, i+2)
 		}
 	}
 	return a
@@ -606,14 +604,20 @@ LOOP:
 		o = strings.TrimLeftFunc(o, unicode.IsSpace)
 		search := strings.ToLower(o)
 
+		// Boolean keyword options ignore surrounding whitespace. Value options
+		// (prefix=, delimiter=, separator=, default=) intentionally preserve any
+		// trailing whitespace as part of their value, so they continue to match on
+		// the left-trimmed-only form.
+		keyword := strings.TrimRightFunc(search, unicode.IsSpace)
+
 		switch {
-		case search == optDecodeUnset:
+		case keyword == optDecodeUnset:
 			opts.DecodeUnset = true
-		case search == optOverwrite:
+		case keyword == optOverwrite:
 			opts.Overwrite = true
-		case search == optRequired:
+		case keyword == optRequired:
 			opts.Required = true
-		case search == optNoInit:
+		case keyword == optNoInit:
 			opts.NoInit = true
 		case strings.HasPrefix(search, optPrefix):
 			opts.Prefix = strings.TrimPrefix(o, optPrefix)
@@ -774,7 +778,7 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 	}
 
 	// Handle pointers and uninitialized pointers.
-	for ef.Type().Kind() == reflect.Ptr {
+	for ef.Type().Kind() == reflect.Pointer {
 		if ef.IsNil() {
 			ef.Set(reflect.New(ef.Type().Elem()))
 		}
@@ -848,11 +852,11 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 		vals := strings.Split(v, delimiter)
 		mp := reflect.MakeMapWithSize(tf, len(vals))
 		for _, val := range vals {
-			pair := strings.SplitN(val, separator, 2)
-			if len(pair) < 2 {
+			mKey, mVal, ok := strings.Cut(val, separator)
+			if !ok {
 				return fmt.Errorf("%s: %w", val, ErrInvalidMapItem)
 			}
-			mKey, mVal := strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])
+			mKey, mVal = strings.TrimSpace(mKey), strings.TrimSpace(mVal)
 
 			k := reflect.New(tf.Key()).Elem()
 			if err := processField(ctx, mKey, k, delimiter, separator, noInit); err != nil {
