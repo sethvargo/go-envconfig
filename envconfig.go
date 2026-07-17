@@ -544,7 +544,7 @@ func processWith(ctx context.Context, c *Config) error {
 		// Apply any mutators. Mutators are applied after the lookup, but before any
 		// type conversions. They always resolve to a string (or error), so we don't
 		// call mutators when the environment variable was not set.
-		if found || usedDefault {
+		if len(mutators) > 0 && (found || usedDefault) {
 			originalKey := key
 			resolvedKey := originalKey
 			if keyer, ok := l.(keyedLookuper); ok {
