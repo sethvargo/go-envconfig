@@ -993,6 +993,22 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "overwrite/present_trailing_space",
+			target: &struct {
+				Field string `env:"FIELD,overwrite "`
+			}{
+				Field: "hello world",
+			},
+			exp: &struct {
+				Field string `env:"FIELD,overwrite "`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
 			name: "overwrite/does_not_overwrite_no_value",
 			target: &struct {
 				Field string `env:"FIELD, overwrite"`
@@ -1161,6 +1177,34 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "required/present_trailing_space",
+			target: &struct {
+				Field string `env:"FIELD,required "`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,required "`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "required/present_surrounding_space",
+			target: &struct {
+				Field string `env:"FIELD, required "`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, required "`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
 			name: "required/missing",
 			target: &struct {
 				Field string `env:"FIELD,required"`
@@ -1215,6 +1259,30 @@ func TestProcessWith(t *testing.T) {
 				Field string `env:"FIELD, default=foo"`
 			}{
 				Field: "foo", // uses default
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "default/trailing_space_preserved",
+			target: &struct {
+				Field string `env:"FIELD,default=foo "`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=foo "`
+			}{
+				Field: "foo ", // value options keep trailing whitespace
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "default/keyword_value_preserved",
+			target: &struct {
+				Field string `env:"FIELD,default=required "`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,default=required "`
+			}{
+				Field: "required ", // value that looks like a keyword stays a value, keeps space
 			},
 			lookuper: MapLookuper(nil),
 		},
