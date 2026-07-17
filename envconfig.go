@@ -587,56 +587,120 @@ func splitString(s, on, esc string) []string {
 	return a
 }
 
-// keyAndOpts parses the given tag value (e.g. env:"foo,required") and
-// returns the key name and options as a list.
-func keyAndOpts(tag string) (string, *options, error) {
-	parts := splitString(tag, ",", "\\")
-	key, tagOpts := strings.TrimSpace(parts[0]), parts[1:]
-
-	if key != "" && !validateEnvName(key) {
-		return "", nil, fmt.Errorf("%q: %w ", key, ErrInvalidEnvvarName)
-	}
-
+// keyAndOpts parses the given tag value (e.g. env:"foo,required") and returns
+// the key name and the parsed options.
+func keyAndOpts(tag string) (string, options, error) {
 	var opts options
 
-LOOP:
-	for i, o := range tagOpts {
-		o = strings.TrimLeftFunc(o, unicode.IsSpace)
-		search := strings.ToLower(o)
-
-		// Boolean keyword options ignore surrounding whitespace. Value options
-		// (prefix=, delimiter=, separator=, default=) intentionally preserve any
-		// trailing whitespace as part of their value, so they continue to match on
-		// the left-trimmed-only form.
-		keyword := strings.TrimRightFunc(search, unicode.IsSpace)
-
-		switch {
-		case keyword == optDecodeUnset:
-			opts.DecodeUnset = true
-		case keyword == optOverwrite:
-			opts.Overwrite = true
-		case keyword == optRequired:
-			opts.Required = true
-		case keyword == optNoInit:
-			opts.NoInit = true
-		case strings.HasPrefix(search, optPrefix):
-			opts.Prefix = strings.TrimPrefix(o, optPrefix)
-		case strings.HasPrefix(search, optDelimiter):
-			opts.Delimiter = strings.TrimPrefix(o, optDelimiter)
-		case strings.HasPrefix(search, optSeparator):
-			opts.Separator = strings.TrimPrefix(o, optSeparator)
-		case strings.HasPrefix(search, optDefault):
-			// If a default value was given, assume everything after is the provided
-			// value, including comma-seprated items.
-			o = strings.TrimLeft(strings.Join(tagOpts[i:], ","), " ")
-			opts.Default = strings.TrimPrefix(o, optDefault)
-			break LOOP
-		default:
-			return "", nil, fmt.Errorf("%q: %w", o, ErrUnknownOption)
+	// Fast path: no comma means the entire tag is the key with no options.
+	if strings.IndexByte(tag, ',') == -1 {
+		key := strings.TrimSpace(tag)
+		if key != "" && !validateEnvName(key) {
+			return "", opts, fmt.Errorf("%q: %w ", key, ErrInvalidEnvvarName)
 		}
+		return key, opts, nil
 	}
 
-	return key, &opts, nil
+	// Escape path: a backslash may escape a comma (for example a literal comma
+	// in a delimiter or default value). This is rare, so fall back to the
+	// allocation-heavier split that resolves escapes.
+	if strings.IndexByte(tag, '\\') != -1 {
+		parts := splitString(tag, ",", "\\")
+		key := strings.TrimSpace(parts[0])
+		if key != "" && !validateEnvName(key) {
+			return "", opts, fmt.Errorf("%q: %w ", key, ErrInvalidEnvvarName)
+		}
+
+		tagOpts := parts[1:]
+		for i, o := range tagOpts {
+			isDefault, err := applyTagOption(o, &opts)
+			if err != nil {
+				return "", opts, err
+			}
+			if isDefault {
+				o = strings.TrimLeft(strings.Join(tagOpts[i:], ","), " ")
+				opts.Default = strings.TrimPrefix(o, optDefault)
+				break
+			}
+		}
+		return key, opts, nil
+	}
+
+	// Common path: commas are present but there are no escapes, so the segments
+	// can be iterated in place without allocating a slice.
+	comma := strings.IndexByte(tag, ',')
+	key := strings.TrimSpace(tag[:comma])
+	if key != "" && !validateEnvName(key) {
+		return "", opts, fmt.Errorf("%q: %w ", key, ErrInvalidEnvvarName)
+	}
+
+	rest := tag[comma+1:]
+	for {
+		c := strings.IndexByte(rest, ',')
+		seg := rest
+		if c != -1 {
+			seg = rest[:c]
+		}
+
+		// A default option consumes the remainder of the tag verbatim, including
+		// any commas, so extract it directly and stop.
+		if hasPrefixFold(strings.TrimLeftFunc(seg, unicode.IsSpace), optDefault) {
+			o := strings.TrimLeft(rest, " ")
+			opts.Default = strings.TrimPrefix(o, optDefault)
+			break
+		}
+
+		if _, err := applyTagOption(seg, &opts); err != nil {
+			return "", opts, err
+		}
+
+		if c == -1 {
+			break
+		}
+		rest = rest[c+1:]
+	}
+
+	return key, opts, nil
+}
+
+// applyTagOption parses a single option token (the text between two commas) and
+// records it on opts. It returns isDefault=true when the token is a "default="
+// option; in that case the caller is responsible for extracting the value,
+// which may itself contain commas.
+//
+// Boolean keyword options ignore surrounding whitespace. Value options
+// (prefix=, delimiter=, separator=, default=) intentionally preserve any
+// trailing whitespace as part of their value.
+func applyTagOption(o string, opts *options) (isDefault bool, err error) {
+	o = strings.TrimLeftFunc(o, unicode.IsSpace)
+	keyword := strings.TrimRightFunc(o, unicode.IsSpace)
+
+	switch {
+	case strings.EqualFold(keyword, optDecodeUnset):
+		opts.DecodeUnset = true
+	case strings.EqualFold(keyword, optOverwrite):
+		opts.Overwrite = true
+	case strings.EqualFold(keyword, optRequired):
+		opts.Required = true
+	case strings.EqualFold(keyword, optNoInit):
+		opts.NoInit = true
+	case hasPrefixFold(o, optPrefix):
+		opts.Prefix = strings.TrimPrefix(o, optPrefix)
+	case hasPrefixFold(o, optDelimiter):
+		opts.Delimiter = strings.TrimPrefix(o, optDelimiter)
+	case hasPrefixFold(o, optSeparator):
+		opts.Separator = strings.TrimPrefix(o, optSeparator)
+	case hasPrefixFold(o, optDefault):
+		return true, nil
+	default:
+		return false, fmt.Errorf("%q: %w", o, ErrUnknownOption)
+	}
+	return false, nil
+}
+
+// hasPrefixFold reports whether s begins with prefix, ignoring case.
+func hasPrefixFold(s, prefix string) bool {
+	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
 }
 
 // lookup looks up the given key using the provided Lookuper and options. The

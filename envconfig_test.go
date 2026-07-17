@@ -3477,3 +3477,230 @@ func TestPrefixLookuperUnwrap(t *testing.T) {
 func ptrTo[T any](i T) *T {
 	return &i
 }
+
+func TestKeyAndOpts(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		tag     string
+		key     string
+		opts    options
+		wantErr error
+	}{
+		{
+			name: "empty",
+			tag:  "",
+			key:  "",
+			opts: options{},
+		},
+		{
+			name: "key_only",
+			tag:  "FIELD",
+			key:  "FIELD",
+			opts: options{},
+		},
+		{
+			name: "key_trims_space",
+			tag:  " FIELD ",
+			key:  "FIELD",
+			opts: options{},
+		},
+		{
+			name: "required",
+			tag:  "FIELD,required",
+			key:  "FIELD",
+			opts: options{
+				Required: true,
+			},
+		},
+		{
+			name: "required_leading_space",
+			tag:  "FIELD, required",
+			key:  "FIELD",
+			opts: options{
+				Required: true,
+			},
+		},
+		{
+			name: "required_trailing_space",
+			tag:  "FIELD,required ",
+			key:  "FIELD",
+			opts: options{
+				Required: true,
+			},
+		},
+		{
+			name: "required_mixed_case",
+			tag:  "FIELD,ReQuIrEd",
+			key:  "FIELD",
+			opts: options{
+				Required: true,
+			},
+		},
+		{
+			name: "noinit",
+			tag:  "FIELD,noinit",
+			key:  "FIELD",
+			opts: options{
+				NoInit: true,
+			},
+		},
+		{
+			name: "overwrite",
+			tag:  "FIELD,overwrite",
+			key:  "FIELD",
+			opts: options{
+				Overwrite: true,
+			},
+		},
+		{
+			name: "decodeunset",
+			tag:  "FIELD,decodeunset",
+			key:  "FIELD",
+			opts: options{
+				DecodeUnset: true,
+			},
+		},
+		{
+			name: "prefix",
+			tag:  "FIELD,prefix=PX_",
+			key:  "FIELD",
+			opts: options{
+				Prefix: "PX_",
+			},
+		},
+		{
+			name: "delimiter",
+			tag:  "FIELD,delimiter=;",
+			key:  "FIELD",
+			opts: options{
+				Delimiter: ";",
+			},
+		},
+		{
+			name: "separator",
+			tag:  "FIELD,separator==",
+			key:  "FIELD",
+			opts: options{
+				Separator: "=",
+			},
+		},
+		{
+			name: "delimiter_escaped_comma",
+			tag:  "FIELD,delimiter=\\,",
+			key:  "FIELD",
+			opts: options{
+				Delimiter: ",",
+			},
+		},
+		{
+			name: "value_preserves_trailing_space",
+			tag:  "FIELD,delimiter= ",
+			key:  "FIELD",
+			opts: options{
+				Delimiter: " ",
+			},
+		},
+		{
+			name: "default_simple",
+			tag:  "FIELD,default=foo",
+			key:  "FIELD",
+			opts: options{
+				Default: "foo",
+			},
+		},
+		{
+			name: "default_with_commas",
+			tag:  "FIELD,default=foo,bar,baz",
+			key:  "FIELD",
+			opts: options{
+				Default: "foo,bar,baz",
+			},
+		},
+		{
+			name: "default_leading_space",
+			tag:  "FIELD, default=foo,bar",
+			key:  "FIELD",
+			opts: options{
+				Default: "foo,bar",
+			},
+		},
+		{
+			name: "default_escaped_comma",
+			tag:  "FIELD,default=a\\,b",
+			key:  "FIELD",
+			opts: options{
+				Default: "a,b",
+			},
+		},
+		{
+			name: "default_escaped_dollar",
+			tag:  "FIELD,default=\\$X",
+			key:  "FIELD",
+			opts: options{
+				Default: "\\$X",
+			},
+		},
+		{
+			name: "default_has_equals",
+			tag:  "FIELD,default=has=equals",
+			key:  "FIELD",
+			opts: options{
+				Default: "has=equals",
+			},
+		},
+		{
+			name: "multiple_opts",
+			tag:  "FIELD,prefix=PX_,required",
+			key:  "FIELD",
+			opts: options{
+				Prefix:   "PX_",
+				Required: true,
+			},
+		},
+		{
+			// Preserves existing behavior: a mixed-case value-option name is
+			// matched but not stripped, so the option name leaks into the value.
+			name: "mixed_case_prefix_not_stripped",
+			tag:  "FIELD,PREFIX=PX_",
+			key:  "FIELD",
+			opts: options{
+				Prefix: "PREFIX=PX_",
+			},
+		},
+		{
+			name:    "unknown_option",
+			tag:     "FIELD,bogus",
+			wantErr: ErrUnknownOption,
+		},
+		{
+			name:    "invalid_name",
+			tag:     "bad-name",
+			wantErr: ErrInvalidEnvvarName,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			key, opts, err := keyAndOpts(tc.tag)
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected error %v, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if key != tc.key {
+				t.Errorf("key: got %q, want %q", key, tc.key)
+			}
+			if diff := cmp.Diff(tc.opts, opts); diff != "" {
+				t.Errorf("opts mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
