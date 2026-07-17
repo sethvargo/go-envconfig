@@ -183,11 +183,19 @@ type prefixLookuper struct {
 }
 
 func (p *prefixLookuper) Lookup(key string) (string, bool) {
-	return p.l.Lookup(p.Key(key))
+	return p.l.Lookup(p.prefix + key)
 }
 
+// Key returns the given key with this lookuper's prefix prepended, resolved
+// through the wrapped lookuper's own Key when it implements the keyed
+// extension. This mirrors Lookup, which hands the prefixed key to the wrapped
+// lookuper: the name returned is the name the underlying chain resolves.
 func (p *prefixLookuper) Key(key string) string {
-	return p.prefix + key
+	key = p.prefix + key
+	if keyer, ok := p.l.(keyedLookuper); ok {
+		key = keyer.Key(key)
+	}
+	return key
 }
 
 func (p *prefixLookuper) Unwrap() Lookuper {
