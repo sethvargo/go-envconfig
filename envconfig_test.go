@@ -3251,6 +3251,40 @@ func TestProcessWith(t *testing.T) {
 			err:    ErrMissingRequired,
 			errMsg: "missing required value: APP_DB_PASSWORD",
 		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/137
+			//
+			// The issue's second symptom: the mutator resolvedKey must be the
+			// fully-resolved name in the same composition, while originalKey
+			// stays the key as defined on the struct.
+			name: "mutate/resolved_key_nested_prefix_keyed_lookuper",
+			target: &struct {
+				DB struct {
+					Password string `env:"PASSWORD"`
+				} `env:", prefix=DB_"`
+			}{},
+			exp: &struct {
+				DB struct {
+					Password string `env:"PASSWORD"`
+				} `env:", prefix=DB_"`
+			}{
+				DB: struct {
+					Password string `env:"PASSWORD"`
+				}{
+					Password: "oKey:PASSWORD, rKey:APP_DB_PASSWORD",
+				},
+			},
+			lookuper: &keyedTestLookuper{
+				l: PrefixLookuper("APP_", MapLookuper(map[string]string{
+					"APP_DB_PASSWORD": "",
+				})),
+			},
+			mutators: []Mutator{
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return fmt.Sprintf("oKey:%s, rKey:%s", oKey, rKey), false, nil
+				}),
+			},
+		},
 	}
 
 	for _, tc := range cases {
