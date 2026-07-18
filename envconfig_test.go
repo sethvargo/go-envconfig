@@ -74,6 +74,28 @@ func (u *unwrappableTestLookuper) Unwrap() Lookuper {
 	return u.l
 }
 
+var (
+	_ Lookuper      = (*keyedTestLookuper)(nil)
+	_ keyedLookuper = (*keyedTestLookuper)(nil)
+)
+
+// keyedTestLookuper decorates another lookuper and forwards the keyed
+// extension to it via Key.
+type keyedTestLookuper struct {
+	l Lookuper
+}
+
+func (k *keyedTestLookuper) Lookup(key string) (string, bool) {
+	return k.l.Lookup(key)
+}
+
+func (k *keyedTestLookuper) Key(key string) string {
+	if keyer, ok := k.l.(keyedLookuper); ok {
+		return keyer.Key(key)
+	}
+	return key
+}
+
 // Level mirrors Zap's level marshalling to reproduce an issue for tests.
 type Level int8
 
@@ -3215,11 +3237,57 @@ func TestProcessWith(t *testing.T) {
 				Field3: "",
 			},
 		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/137
+			name: "required/missing_nested_prefix_keyed_lookuper",
+			target: &struct {
+				DB struct {
+					Password string `env:"PASSWORD, required"`
+				} `env:", prefix=DB_"`
+			}{},
+			lookuper: &keyedTestLookuper{
+				l: PrefixLookuper("APP_", MapLookuper(nil)),
+			},
+			err:    ErrMissingRequired,
+			errMsg: "missing required value: APP_DB_PASSWORD",
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/137
+			//
+			// The issue's second symptom: the mutator resolvedKey must be the
+			// fully-resolved name in the same composition, while originalKey
+			// stays the key as defined on the struct.
+			name: "mutate/resolved_key_nested_prefix_keyed_lookuper",
+			target: &struct {
+				DB struct {
+					Password string `env:"PASSWORD"`
+				} `env:", prefix=DB_"`
+			}{},
+			exp: &struct {
+				DB struct {
+					Password string `env:"PASSWORD"`
+				} `env:", prefix=DB_"`
+			}{
+				DB: struct {
+					Password string `env:"PASSWORD"`
+				}{
+					Password: "oKey:PASSWORD, rKey:APP_DB_PASSWORD",
+				},
+			},
+			lookuper: &keyedTestLookuper{
+				l: PrefixLookuper("APP_", MapLookuper(map[string]string{
+					"APP_DB_PASSWORD": "",
+				})),
+			},
+			mutators: []Mutator{
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return fmt.Sprintf("oKey:%s, rKey:%s", oKey, rKey), false, nil
+				}),
+			},
+		},
 	}
 
 	for _, tc := range cases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -3405,8 +3473,6 @@ func TestValidateEnvName(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -3443,8 +3509,6 @@ func TestPrefixLookuperUnwrap(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -3469,6 +3533,69 @@ func TestPrefixLookuperUnwrap(t *testing.T) {
 				}
 			case <-time.After(5 * time.Second):
 				t.Fatal("Unwrap did not terminate")
+			}
+		})
+	}
+}
+
+func TestPrefixLookuperKey(t *testing.T) {
+	t.Parallel()
+
+	base := MapLookuper(map[string]string{"A_B_KEY": "value"})
+
+	cases := []struct {
+		name     string
+		lookuper Lookuper
+		expKey   string
+		expFound bool
+	}{
+		{
+			name:     "plain",
+			lookuper: PrefixLookuper("PREFIX_", base),
+			expKey:   "PREFIX_KEY",
+			expFound: false,
+		},
+		{
+			name:     "stacked_prefixes_flatten",
+			lookuper: PrefixLookuper("B_", PrefixLookuper("A_", base)),
+			expKey:   "A_B_KEY",
+			expFound: true,
+		},
+		{
+			name: "keyed_wrapped_lookuper",
+			lookuper: PrefixLookuper("B_", &keyedTestLookuper{
+				l: PrefixLookuper("A_", base),
+			}),
+			expKey:   "A_B_KEY",
+			expFound: true,
+		},
+		{
+			// A lookuper that does not implement the keyed extension hides its
+			// name mapping: Key stops at the local prefix, but Lookup still
+			// resolves through the chain.
+			name: "unkeyed_wrapped_lookuper",
+			lookuper: PrefixLookuper("B_", &unwrappableTestLookuper{
+				l: PrefixLookuper("A_", base),
+			}),
+			expKey:   "B_KEY",
+			expFound: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got, want := tc.lookuper.(keyedLookuper).Key("KEY"), tc.expKey; got != want {
+				t.Errorf("expected Key(%q) to be %q (got %q)", "KEY", want, got)
+			}
+
+			v, ok := tc.lookuper.Lookup("KEY")
+			if got, want := ok, tc.expFound; got != want {
+				t.Errorf("expected Lookup(%q) found to be %t (got %t)", "KEY", want, got)
+			}
+			if tc.expFound && v != "value" {
+				t.Errorf("expected Lookup(%q) to resolve %q (got %q)", "KEY", "value", v)
 			}
 		})
 	}
