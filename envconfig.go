@@ -97,6 +97,7 @@ const (
 	ErrNotStruct          = internalError("input must be a struct")
 	ErrPrefixNotStruct    = internalError("prefix is only valid on struct types")
 	ErrPrivateField       = internalError("cannot parse private fields")
+	ErrRecursivePointer   = internalError("pointer type is recursive")
 	ErrRecursiveStruct    = internalError("struct type is recursive")
 	ErrRequiredAndDefault = internalError("field cannot be required and have a default value")
 	ErrUnknownOption      = internalError("unknown option")
@@ -449,33 +450,55 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 		required := structRequired || opts.Required
 
 		isNilStructPtr := false
+		var nilPtrOrigin reflect.Value
 		setNilStruct := func(v reflect.Value) {
-			origin := e.Field(i)
 			if isNilStructPtr {
-				empty := reflect.New(origin.Type().Elem()).Interface()
+				empty := reflect.New(v.Type().Elem()).Interface()
 
 				// If a struct (after traversal) equals to the empty value, it means
 				// nothing was changed in any sub-fields. With the noinit opt, we skip
 				// setting the empty value to the original struct pointer (keep it nil).
 				if !reflect.DeepEqual(v.Interface(), empty) || !noInit {
-					origin.Set(v)
+					// The origin is the nil pointer the traversal was started from.
+					// It can sit several pointer levels away from the struct, so
+					// rebuild the levels in between before writing back.
+					for v.Type() != nilPtrOrigin.Type() {
+						p := reflect.New(v.Type())
+						p.Elem().Set(v)
+						v = p
+					}
+					nilPtrOrigin.Set(v)
 				}
 			}
 		}
 
 		// Initialize pointer structs.
 		pointerWasSet := false
+		if ef.Kind() == reflect.Pointer && ef.Type().Elem().Kind() == reflect.Pointer {
+			// A named pointer type can dereference to itself (type P *P), directly
+			// or through other named pointer types. No chain of such a type ever
+			// reaches a value to decode into, so dereferencing one below (or
+			// materializing one in processField) would never terminate.
+			if _, ok := nonPointerType(ef.Type()); !ok {
+				return fmt.Errorf("%s: %s: %w", tf.Name, ef.Type(), ErrRecursivePointer)
+			}
+		}
 		for ef.Kind() == reflect.Pointer {
 			if ef.IsNil() {
-				if ef.Type().Elem().Kind() != reflect.Struct {
-					// This is a nil pointer to something that isn't a struct, like
-					// *string. Move along.
+				base, _ := nonPointerType(ef.Type()) // cannot cycle, checked above
+				if base.Kind() != reflect.Struct {
+					// This is a nil pointer chain to something that isn't a struct,
+					// like *string or **string. Move along; processField
+					// materializes those through the field itself.
 					break
 				}
 
 				isNilStructPtr = true
-				// Use an empty struct of the type so we can traverse.
-				ef = reflect.New(ef.Type().Elem()).Elem()
+				nilPtrOrigin = ef
+				// Use an empty struct of the base type so we can traverse; the
+				// write-back in setNilStruct rebuilds any pointer levels between
+				// the origin and the struct.
+				ef = reflect.New(base).Elem()
 			} else {
 				pointerWasSet = true
 				ef = ef.Elem()
@@ -853,6 +876,28 @@ func processAsDecoder(ctx context.Context, v string, ef reflect.Value) (bool, er
 	return imp, err
 }
 
+// nonPointerType returns the first non-pointer type reached by successively
+// dereferencing t, and reports whether one exists. Named pointer types can
+// dereference to themselves (type P *P), directly or through other named
+// pointer types; such a chain never reaches a non-pointer type. The two
+// cursors advance at different speeds, so on a cyclic chain they eventually
+// meet, without allocating a set of visited types.
+func nonPointerType(t reflect.Type) (reflect.Type, bool) {
+	slow, fast := t, t
+	for fast.Kind() == reflect.Pointer {
+		fast = fast.Elem()
+		if fast.Kind() != reflect.Pointer {
+			return fast, true
+		}
+		fast = fast.Elem()
+		slow = slow.Elem()
+		if slow == fast {
+			return nil, false
+		}
+	}
+	return fast, true
+}
+
 func processField(ctx context.Context, v string, ef reflect.Value, delimiter, separator string, noInit bool) error {
 	// If the input value is empty and initialization is skipped, do nothing.
 	if v == "" && noInit {
@@ -860,6 +905,14 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 	}
 
 	// Handle pointers and uninitialized pointers.
+	if ef.Type().Kind() == reflect.Pointer && ef.Type().Elem().Kind() == reflect.Pointer {
+		// Collection elements do not pass through the field-level check in
+		// processWith, so reject recursive pointer types here too, before the
+		// materialization below chases the chain.
+		if _, ok := nonPointerType(ef.Type()); !ok {
+			return fmt.Errorf("%s: %w", ef.Type(), ErrRecursivePointer)
+		}
+	}
 	for ef.Type().Kind() == reflect.Pointer {
 		if ef.IsNil() {
 			ef.Set(reflect.New(ef.Type().Elem()))

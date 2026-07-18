@@ -312,13 +312,29 @@ type reusedLeaf struct {
 	Value string `env:"VALUE"`
 }
 
-// doublePointerNode's self-reference sits behind a pointer to a pointer: the
-// descent materializes only pointers directly to structs, so a nil
-// **doublePointerNode is skipped rather than materialized.
+// doublePointerNode's self-reference sits behind a pointer to a pointer:
+// materialization reaches the struct at the end of a pointer chain of any
+// depth, so the type re-enters the descent path whether the chain is nil or
+// populated.
 type doublePointerNode struct {
 	Value string `env:"VALUE"`
 	Next  **doublePointerNode
 }
+
+// pointerChainLeaf sits at the end of the multi-level pointer chains in the
+// multi_pointer tests.
+type pointerChainLeaf struct {
+	Value string `env:"VALUE"`
+}
+
+// selfPointer dereferences to itself: no chain of it ever reaches a
+// non-pointer type to decode into.
+type selfPointer *selfPointer
+
+// mutualPointerA and mutualPointerB dereference to each other.
+type mutualPointerA *mutualPointerB
+
+type mutualPointerB *mutualPointerA
 
 func TestProcessWithConfigArgument(t *testing.T) {
 	t.Parallel()
@@ -3352,16 +3368,17 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
-			// A nil pointer-to-pointer is skipped, not materialized: the
-			// descent never re-enters the type, so the shape keeps decoding.
-			name:   "recursive/pointer_to_pointer_nil_ok",
+			// Materialization reaches the struct at the end of a pointer chain
+			// of any depth, so a recursive type behind a nil pointer-to-pointer
+			// re-enters the descent path exactly like the populated chain
+			// below: the rejection is type-level, not data-dependent.
+			name:   "recursive/pointer_to_pointer_nil",
 			target: &doublePointerNode{},
-			exp: &doublePointerNode{
-				Value: "v",
-			},
 			lookuper: MapLookuper(map[string]string{
 				"VALUE": "v",
 			}),
+			err:    ErrRecursiveStruct,
+			errMsg: "Next: envconfig.doublePointerNode: struct type is recursive",
 		},
 		{
 			// A populated pointer-to-pointer chain re-enters the type, so it
@@ -3399,6 +3416,203 @@ func TestProcessWith(t *testing.T) {
 				"A_VALUE": "a",
 				"B_VALUE": "b",
 			}),
+		},
+
+		// Multi-level pointers
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/143
+			// A nil pointer chain of any depth ending at a struct is
+			// materialized and written back, wired through every level.
+			name: "multi_pointer/materializes_nil_chain",
+			target: &struct {
+				P **pointerChainLeaf
+			}{},
+			exp: &struct {
+				P **pointerChainLeaf
+			}{
+				P: ptrTo(ptrTo(pointerChainLeaf{Value: "v"})),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+		},
+		{
+			name: "multi_pointer/materializes_nil_chain_deep",
+			target: &struct {
+				P ***pointerChainLeaf
+			}{},
+			exp: &struct {
+				P ***pointerChainLeaf
+			}{
+				P: ptrTo(ptrTo(ptrTo(pointerChainLeaf{Value: "v"}))),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+		},
+		{
+			// Without noinit, a nil chain is initialized even when nothing was
+			// set, matching the single-level behavior.
+			name: "multi_pointer/initializes_empty_chain",
+			target: &struct {
+				P **pointerChainLeaf
+			}{},
+			exp: &struct {
+				P **pointerChainLeaf
+			}{
+				P: ptrTo(ptrTo(pointerChainLeaf{})),
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/143
+			// A nil pointer partway down a populated chain: the write-back
+			// goes to that pointer, not to the field, which used to panic in
+			// reflect.Set.
+			name: "multi_pointer/inner_nil_write_back",
+			target: &struct {
+				P **pointerChainLeaf
+			}{
+				P: ptrTo((*pointerChainLeaf)(nil)),
+			},
+			exp: &struct {
+				P **pointerChainLeaf
+			}{
+				P: ptrTo(ptrTo(pointerChainLeaf{Value: "v"})),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+		},
+		{
+			// noinit holds across the whole chain: nothing was set, so the
+			// field stays nil at every level.
+			name: "multi_pointer/noinit_keeps_chain_nil",
+			target: &struct {
+				P **pointerChainLeaf `env:",noinit"`
+			}{},
+			exp: &struct {
+				P **pointerChainLeaf `env:",noinit"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			// noinit with a populated outer pointer and nothing set: the nil
+			// inner pointer is left alone.
+			name: "multi_pointer/noinit_keeps_inner_nil",
+			target: &struct {
+				P **pointerChainLeaf `env:",noinit"`
+			}{
+				P: ptrTo((*pointerChainLeaf)(nil)),
+			},
+			exp: &struct {
+				P **pointerChainLeaf `env:",noinit"`
+			}{
+				P: ptrTo((*pointerChainLeaf)(nil)),
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			// A fully populated chain decodes in place, no write-back needed.
+			name: "multi_pointer/populated_chain_in_place",
+			target: &struct {
+				P **pointerChainLeaf
+			}{
+				P: ptrTo(ptrTo(pointerChainLeaf{})),
+			},
+			exp: &struct {
+				P **pointerChainLeaf
+			}{
+				P: ptrTo(ptrTo(pointerChainLeaf{Value: "v"})),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+		},
+		{
+			// A prefix descends through any pointer depth; it used to be
+			// rejected with ErrPrefixNotStruct beyond one level.
+			name: "multi_pointer/prefix_descends_chain",
+			target: &struct {
+				Sub **pointerChainLeaf `env:", prefix=SUB_"`
+			}{},
+			exp: &struct {
+				Sub **pointerChainLeaf `env:", prefix=SUB_"`
+			}{
+				Sub: ptrTo(ptrTo(pointerChainLeaf{Value: "v"})),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"SUB_VALUE": "v",
+			}),
+		},
+
+		// Recursive pointer types
+		{
+			// A self-referential pointer type never reaches a value to decode
+			// into, so it is rejected up front, nil or not. A non-nil chain
+			// used to spin the dereference loop forever.
+			name: "recursive_pointer/nil",
+			target: &struct {
+				Link selfPointer
+			}{},
+			lookuper: MapLookuper(nil),
+			err:      ErrRecursivePointer,
+			errMsg:   "Link: envconfig.selfPointer: pointer type is recursive",
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/143
+			name: "recursive_pointer/self_pointing_value",
+			target: func() any {
+				var p selfPointer
+				p = &p
+				return &struct {
+					Link selfPointer
+				}{
+					Link: p,
+				}
+			}(),
+			lookuper: MapLookuper(nil),
+			err:      ErrRecursivePointer,
+			errMsg:   "Link: envconfig.selfPointer: pointer type is recursive",
+		},
+		{
+			// Mutually recursive pointer types are the same cycle one step
+			// apart.
+			name: "recursive_pointer/mutual",
+			target: &struct {
+				Link mutualPointerA
+			}{},
+			lookuper: MapLookuper(nil),
+			err:      ErrRecursivePointer,
+			errMsg:   "Link: envconfig.mutualPointerA: pointer type is recursive",
+		},
+		{
+			// A tagged nil field of a recursive pointer type used to reach the
+			// pointer materialization in processField and allocate without
+			// bound.
+			name: "recursive_pointer/tagged_nil",
+			target: &struct {
+				Link selfPointer `env:"LINK"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"LINK": "x",
+			}),
+			err:    ErrRecursivePointer,
+			errMsg: "Link: envconfig.selfPointer: pointer type is recursive",
+		},
+		{
+			// Collection elements decode through processField and its pointer
+			// materialization directly, without passing the field-level check,
+			// so the element type is rejected there.
+			name: "recursive_pointer/slice_element",
+			target: &struct {
+				Links []selfPointer `env:"LINKS"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"LINKS": "a",
+			}),
+			err:    ErrRecursivePointer,
+			errMsg: "envconfig.selfPointer: pointer type is recursive",
 		},
 	}
 
