@@ -282,6 +282,44 @@ type MapStruct struct {
 
 type Base64ByteSlice []Base64Bytes
 
+// recursiveNode is self-referential through an untagged field: the descent
+// recurses into exported struct pointers whether or not they carry an env
+// tag.
+type recursiveNode struct {
+	Next *recursiveNode
+}
+
+// recursiveA and recursiveB form a mutually recursive pair.
+type recursiveA struct {
+	B *recursiveB
+}
+
+type recursiveB struct {
+	A *recursiveA
+}
+
+// recursiveTree carries its self-reference in a slice. Collections decode as
+// leaves (element structs are never descended), so the type is not recursive
+// for the descent and must keep decoding.
+type recursiveTree struct {
+	Name     string `env:"NAME"`
+	Children []recursiveTree
+}
+
+// reusedLeaf is used by two sibling fields at once: repeated use of a type
+// that does not cycle must keep decoding.
+type reusedLeaf struct {
+	Value string `env:"VALUE"`
+}
+
+// doublePointerNode's self-reference sits behind a pointer to a pointer: the
+// descent materializes only pointers directly to structs, so a nil
+// **doublePointerNode is skipped rather than materialized.
+type doublePointerNode struct {
+	Value string `env:"VALUE"`
+	Next  **doublePointerNode
+}
+
 func TestProcessWithConfigArgument(t *testing.T) {
 	t.Parallel()
 
@@ -3284,6 +3322,83 @@ func TestProcessWith(t *testing.T) {
 					return fmt.Sprintf("oKey:%s, rKey:%s", oKey, rKey), false, nil
 				}),
 			},
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/141
+			name:     "recursive/self_referential",
+			target:   &recursiveNode{},
+			lookuper: MapLookuper(nil),
+			err:      ErrRecursiveStruct,
+			errMsg:   "Next: envconfig.recursiveNode: struct type is recursive",
+		},
+		{
+			// https://github.com/sethvargo/go-envconfig/issues/141
+			name:     "recursive/mutually_recursive",
+			target:   &recursiveA{},
+			lookuper: MapLookuper(nil),
+			err:      ErrRecursiveStruct,
+			errMsg:   "B: A: envconfig.recursiveA: struct type is recursive",
+		},
+		{
+			// Collections decode as leaves, so a slice-carried self-reference
+			// is not recursive for the descent and must keep decoding.
+			name:   "recursive/slice_carried_self_reference_ok",
+			target: &recursiveTree{},
+			exp: &recursiveTree{
+				Name: "root",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"NAME": "root",
+			}),
+		},
+		{
+			// A nil pointer-to-pointer is skipped, not materialized: the
+			// descent never re-enters the type, so the shape keeps decoding.
+			name:   "recursive/pointer_to_pointer_nil_ok",
+			target: &doublePointerNode{},
+			exp: &doublePointerNode{
+				Value: "v",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+		},
+		{
+			// A populated pointer-to-pointer chain re-enters the type, so it
+			// is rejected even though its nil tail would have been skipped.
+			// Deliberate: every node in the chain reads the same keys, so a
+			// recursive chain has no distinct meaning per level, and a
+			// deterministic type-level rejection beats a data-dependent one.
+			name: "recursive/pointer_to_pointer_populated",
+			target: func() *doublePointerNode {
+				inner := &doublePointerNode{}
+				return &doublePointerNode{Next: &inner}
+			}(),
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+			err:    ErrRecursiveStruct,
+			errMsg: "Next: envconfig.doublePointerNode: struct type is recursive",
+		},
+		{
+			// Repeated sibling use of one struct type does not cycle and must
+			// keep decoding: the detection is per descent path, not global.
+			name: "recursive/sibling_reuse_ok",
+			target: &struct {
+				A reusedLeaf `env:", prefix=A_"`
+				B reusedLeaf `env:", prefix=B_"`
+			}{},
+			exp: &struct {
+				A reusedLeaf `env:", prefix=A_"`
+				B reusedLeaf `env:", prefix=B_"`
+			}{
+				A: reusedLeaf{Value: "a"},
+				B: reusedLeaf{Value: "b"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"A_VALUE": "a",
+				"B_VALUE": "b",
+			}),
 		},
 	}
 

@@ -97,6 +97,7 @@ const (
 	ErrNotStruct          = internalError("input must be a struct")
 	ErrPrefixNotStruct    = internalError("prefix is only valid on struct types")
 	ErrPrivateField       = internalError("cannot parse private fields")
+	ErrRecursiveStruct    = internalError("struct type is recursive")
 	ErrRequiredAndDefault = internalError("field cannot be required and have a default value")
 	ErrUnknownOption      = internalError("unknown option")
 )
@@ -350,11 +351,15 @@ func ProcessWith(ctx context.Context, c *Config) error {
 		return m == nil
 	})
 
-	return processWith(ctx, c)
+	return processWith(ctx, c, make(map[reflect.Type]bool))
 }
 
 // processWith is a helper that retains configuration from the parent structs.
-func processWith(ctx context.Context, c *Config) error {
+// path tracks the struct types on the current descent path: the descent
+// materializes nil struct pointers as it goes, so a type cycle can never
+// terminate on its own and is reported as [ErrRecursiveStruct] instead of
+// recursing without bound.
+func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) error {
 	i := c.Target
 
 	l := c.Lookuper
@@ -373,6 +378,11 @@ func processWith(ctx context.Context, c *Config) error {
 	}
 
 	t := e.Type()
+	if path[t] {
+		return fmt.Errorf("%s: %w", t, ErrRecursiveStruct)
+	}
+	path[t] = true
+	defer delete(path, t)
 
 	structDelimiter := c.DefaultDelimiter
 	if structDelimiter == "" {
@@ -512,7 +522,7 @@ func processWith(ctx context.Context, c *Config) error {
 				DefaultOverwrite: overwrite,
 				DefaultRequired:  required,
 				Mutators:         mutators,
-			}); err != nil {
+			}, path); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 
