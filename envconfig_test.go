@@ -327,6 +327,13 @@ type pointerChainLeaf struct {
 	Value string `env:"VALUE"`
 }
 
+// namedLeafPointer and namedDoubleLeafPointer are named pointer types in the
+// chain: the write-back must preserve the field's declared type at every
+// level rather than rebuilding the chain from unnamed pointer types.
+type namedLeafPointer *pointerChainLeaf
+
+type namedDoubleLeafPointer **pointerChainLeaf
+
 // selfPointer dereferences to itself: no chain of it ever reaches a
 // non-pointer type to decode into.
 type selfPointer *selfPointer
@@ -3543,6 +3550,53 @@ func TestProcessWith(t *testing.T) {
 			},
 			lookuper: MapLookuper(map[string]string{
 				"SUB_VALUE": "v",
+			}),
+		},
+		{
+			// A named pointer type as the field type: the attached value must
+			// carry the declared type, which only assignability permits (an
+			// identity-based rebuild of the chain never terminates).
+			name: "multi_pointer/named_pointer",
+			target: &struct {
+				P namedLeafPointer
+			}{},
+			exp: &struct {
+				P namedLeafPointer
+			}{
+				P: namedLeafPointer(ptrTo(pointerChainLeaf{Value: "v"})),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+		},
+		{
+			// A named pointer type in the middle of the chain.
+			name: "multi_pointer/pointer_to_named_pointer",
+			target: &struct {
+				P *namedLeafPointer
+			}{},
+			exp: &struct {
+				P *namedLeafPointer
+			}{
+				P: ptrTo(namedLeafPointer(ptrTo(pointerChainLeaf{Value: "v"}))),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
+			}),
+		},
+		{
+			// A named pointer-to-pointer type as the field type.
+			name: "multi_pointer/named_double_pointer",
+			target: &struct {
+				P namedDoubleLeafPointer
+			}{},
+			exp: &struct {
+				P namedDoubleLeafPointer
+			}{
+				P: namedDoubleLeafPointer(ptrTo(ptrTo(pointerChainLeaf{Value: "v"}))),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"VALUE": "v",
 			}),
 		},
 

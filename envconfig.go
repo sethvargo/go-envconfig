@@ -450,7 +450,7 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 		required := structRequired || opts.Required
 
 		isNilStructPtr := false
-		var nilPtrOrigin reflect.Value
+		var nilPtrOrigin, nilPtrChain reflect.Value
 		setNilStruct := func(v reflect.Value) {
 			if isNilStructPtr {
 				empty := reflect.New(v.Type().Elem()).Interface()
@@ -459,15 +459,7 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 				// nothing was changed in any sub-fields. With the noinit opt, we skip
 				// setting the empty value to the original struct pointer (keep it nil).
 				if !reflect.DeepEqual(v.Interface(), empty) || !noInit {
-					// The origin is the nil pointer the traversal was started from.
-					// It can sit several pointer levels away from the struct, so
-					// rebuild the levels in between before writing back.
-					for v.Type() != nilPtrOrigin.Type() {
-						p := reflect.New(v.Type())
-						p.Elem().Set(v)
-						v = p
-					}
-					nilPtrOrigin.Set(v)
+					nilPtrOrigin.Set(nilPtrChain)
 				}
 			}
 		}
@@ -495,10 +487,18 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 
 				isNilStructPtr = true
 				nilPtrOrigin = ef
-				// Use an empty struct of the base type so we can traverse; the
-				// write-back in setNilStruct rebuilds any pointer levels between
-				// the origin and the struct.
-				ef = reflect.New(base).Elem()
+				// Materialize a detached pointer chain that keeps the field's
+				// declared type at every level, initializing each cell from its
+				// own element type the way processField's pointer loop does, and
+				// traverse the empty struct at its end. setNilStruct attaches
+				// the whole chain to the origin with a single Set.
+				nilPtrChain = reflect.New(ef.Type().Elem())
+				cell := nilPtrChain.Elem()
+				for cell.Kind() == reflect.Pointer {
+					cell.Set(reflect.New(cell.Type().Elem()))
+					cell = cell.Elem()
+				}
+				ef = cell
 			} else {
 				pointerWasSet = true
 				ef = ef.Elem()
