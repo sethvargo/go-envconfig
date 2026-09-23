@@ -2538,6 +2538,35 @@ func TestProcessWith(t *testing.T) {
 				}),
 			},
 		},
+		{
+			name: "mutate/struct_decoder_url",
+			target: &struct {
+				Field url.URL `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field url.URL `env:"FIELD"`
+			}{
+				Field: url.URL{Scheme: "http", Host: "host", Path: "/p"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "http://secret/p",
+			}),
+			mutators: []Mutator{
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return strings.ReplaceAll(cVal, "secret", "host"), false, nil
+				}),
+			},
+		},
+		{
+			name: "mutate/struct_decoder_error_names_field",
+			target: &struct {
+				Field time.Time `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "nope",
+			}),
+			errMsg: "Field: ",
+		},
 
 		// Nesting
 		{
