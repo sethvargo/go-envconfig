@@ -71,6 +71,8 @@ func (m MutatorFunc) EnvMutate(ctx context.Context, originalKey, resolvedKey, or
 func LegacyMutatorFunc(fn func(ctx context.Context, key, value string) (string, error)) MutatorFunc {
 	return func(ctx context.Context, originalKey, resolvedKey, originalValue, currentValue string) (newValue string, stop bool, err error) {
 		v, err := fn(ctx, originalKey, currentValue)
-		return v, true, err
+		// The old signature couldn't stop the chain, so don't stop it here. "Lossy"
+		// refers to the dropped key/value args, not the chain.
+		return v, false, err
 	}
 }
