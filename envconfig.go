@@ -549,20 +549,28 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 				}
 			}
 
+			// A struct with its own decoder has no fields to initialize. Walking it
+			// when unset would materialize inner pointers like url.URL.User.
+			if implementsDecoder(ef) {
+				setNilStruct(ef)
+				continue
+			}
+
 			plu := l
 			if opts.Prefix != "" {
 				plu = PrefixLookuper(opts.Prefix, l)
 			}
 
 			if err := processWith(ctx, &Config{
-				Target:           ef.Interface(),
-				Lookuper:         plu,
-				DefaultDelimiter: delimiter,
-				DefaultSeparator: separator,
-				DefaultNoInit:    noInit,
-				DefaultOverwrite: overwrite,
-				DefaultRequired:  required,
-				Mutators:         mutators,
+				Target:             ef.Interface(),
+				Lookuper:           plu,
+				DefaultDelimiter:   delimiter,
+				DefaultSeparator:   separator,
+				DefaultNoInit:      noInit,
+				DefaultOverwrite:   overwrite,
+				DefaultDecodeUnset: decodeUnset,
+				DefaultRequired:    required,
+				Mutators:           mutators,
 			}, path); err != nil {
 				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
@@ -597,6 +605,12 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 		// specified, do not overwrite the existing field. We only want to overwrite
 		// when the envvar was provided directly.
 		if (pointerWasSet || !ef.IsZero()) && !found {
+			continue
+		}
+
+		// Skip decoders on unset variables without decodeunset. A decoder that
+		// rejects "" must not fail for a variable the user never set.
+		if !found && !usedDefault && !decodeUnset && implementsDecoder(ef) {
 			continue
 		}
 
