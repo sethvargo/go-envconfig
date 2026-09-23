@@ -1192,6 +1192,74 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 
+		// Types with custom decoders (time.Time, url.URL, and so on) keep an
+		// existing non-zero value unless overwrite is set.
+		// https://github.com/sethvargo/go-envconfig/issues/145
+		{
+			name: "overwrite/does_not_overwrite_existing_time",
+			target: &struct {
+				Field time.Time `env:"FIELD"`
+			}{
+				Field: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+			exp: &struct {
+				Field time.Time `env:"FIELD"`
+			}{
+				Field: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "2020-06-15T12:00:00Z",
+			}),
+		},
+		{
+			name: "overwrite/does_not_overwrite_existing_time_pointer",
+			target: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{
+				Field: ptrTo(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)),
+			},
+			exp: &struct {
+				Field *time.Time `env:"FIELD"`
+			}{
+				Field: ptrTo(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "2020-06-15T12:00:00Z",
+			}),
+		},
+		{
+			name: "overwrite/does_not_overwrite_existing_url",
+			target: &struct {
+				Field url.URL `env:"FIELD"`
+			}{
+				Field: url.URL{Scheme: "https", Host: "existing.example"},
+			},
+			exp: &struct {
+				Field url.URL `env:"FIELD"`
+			}{
+				Field: url.URL{Scheme: "https", Host: "existing.example"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "https://from-env.example",
+			}),
+		},
+		{
+			name: "overwrite/does_not_overwrite_existing_url_pointer",
+			target: &struct {
+				Field *url.URL `env:"FIELD"`
+			}{
+				Field: &url.URL{Scheme: "https", Host: "existing.example"},
+			},
+			exp: &struct {
+				Field *url.URL `env:"FIELD"`
+			}{
+				Field: &url.URL{Scheme: "https", Host: "existing.example"},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "https://from-env.example",
+			}),
+		},
+
 		// Decode Unset
 		{
 			name: "decodeunset/present",
@@ -1653,14 +1721,14 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "custom_decoder/gob_decoder",
 			target: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					implementsGobDecoder: true,
 				},
 			},
 			exp: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					value: "GOB-foo",
@@ -1673,7 +1741,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "custom_decoder/binary_unmarshaler",
 			target: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					implementsBinaryUnmarshaler: true,
@@ -1681,7 +1749,7 @@ func TestProcessWith(t *testing.T) {
 				},
 			},
 			exp: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					value: "BINARY-foo",
@@ -1694,7 +1762,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "custom_decoder/json_unmarshaler",
 			target: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					implementsBinaryUnmarshaler: true,
@@ -1703,7 +1771,7 @@ func TestProcessWith(t *testing.T) {
 				},
 			},
 			exp: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					implementsTextUnmarshaler: true,
@@ -1717,7 +1785,7 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "custom_decoder/text_unmarshaler",
 			target: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					implementsTextUnmarshaler:   true,
@@ -1727,7 +1795,7 @@ func TestProcessWith(t *testing.T) {
 				},
 			},
 			exp: &struct {
-				Field CustomStdLibDecodingType `env:"FIELD"`
+				Field CustomStdLibDecodingType `env:"FIELD,overwrite"`
 			}{
 				Field: CustomStdLibDecodingType{
 					implementsTextUnmarshaler: true,
