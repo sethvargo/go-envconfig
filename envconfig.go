@@ -615,6 +615,13 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 			}
 		}
 
+		// A found empty value overwrites. Reset to zero because "" can't parse into
+		// most kinds. Decoders may handle "" specially, so let them run in processField.
+		if val == "" && found && !implementsDecoder(ef) {
+			ef.SetZero()
+			continue
+		}
+
 		// Set value.
 		if err := processField(ctx, val, ef, delimiter, separator, noInit); err != nil {
 			return fmt.Errorf("%s: %w", tf.Name, err)

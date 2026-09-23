@@ -1136,6 +1136,48 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "overwrite/applies_empty_value",
+			target: &struct {
+				Field string `env:"FIELD,overwrite"`
+			}{
+				Field: "existing",
+			},
+			exp: &struct {
+				Field string `env:"FIELD,overwrite"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+		},
+		{
+			name: "overwrite/applies_empty_value_int",
+			target: &struct {
+				Field int `env:"FIELD,overwrite"`
+			}{
+				Field: 5,
+			},
+			exp: &struct {
+				Field int `env:"FIELD,overwrite"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+		},
+		{
+			name: "overwrite/applies_empty_value_slice",
+			target: &struct {
+				Field []string `env:"FIELD,overwrite"`
+			}{
+				Field: []string{"existing"},
+			},
+			exp: &struct {
+				Field []string `env:"FIELD,overwrite"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+		},
+		{
 			name: "overwrite/default_does_not_overwrite_no_value",
 			target: &struct {
 				Field string `env:"FIELD, overwrite, default=default"`
