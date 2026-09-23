@@ -33,24 +33,12 @@ import (
 
 var _ DecoderCtx = (*CustomDecoderType)(nil)
 
-// CustomDecoderType is used to test custom decoding using Decoder.
+// CustomDecoderType is used to test custom decoding using DecoderCtx.
 type CustomDecoderType struct {
 	value string
 }
 
 func (c *CustomDecoderType) EnvDecode(ctx context.Context, val string) error {
-	c.value = "CUSTOM-" + val
-	return nil
-}
-
-var _ Decoder = (*CustomDecoderTypeLegacy)(nil)
-
-// CustomDecoderTypeLegacy is used to test custom decoding using Decoder.
-type CustomDecoderTypeLegacy struct {
-	value string
-}
-
-func (c *CustomDecoderTypeLegacy) EnvDecode(val string) error {
 	c.value = "CUSTOM-" + val
 	return nil
 }
@@ -178,7 +166,7 @@ func (c *CustomStdLibDecodingType) GobDecode(data []byte) error {
 }
 
 var (
-	_ Decoder                    = (*CustomTypeError)(nil)
+	_ DecoderCtx                 = (*CustomTypeError)(nil)
 	_ encoding.BinaryUnmarshaler = (*CustomTypeError)(nil)
 	_ gob.GobDecoder             = (*CustomTypeError)(nil)
 	_ json.Unmarshaler           = (*CustomTypeError)(nil)
@@ -190,7 +178,7 @@ type CustomTypeError struct {
 	Field string
 }
 
-func (c *CustomTypeError) EnvDecode(val string) error {
+func (c *CustomTypeError) EnvDecode(ctx context.Context, val string) error {
 	return fmt.Errorf("broken")
 }
 
@@ -1801,14 +1789,6 @@ func TestProcessWith(t *testing.T) {
 		{
 			name: "syntax/=key",
 			target: &struct {
-				Field CustomDecoderTypeLegacy `env:"FIELD=foo"`
-			}{},
-			lookuper: MapLookuper(nil),
-			err:      ErrInvalidEnvvarName,
-		},
-		{
-			name: "syntax/=key",
-			target: &struct {
 				Field CustomDecoderType `env:"FIELD=foo"`
 			}{},
 			lookuper: MapLookuper(nil),
@@ -1991,98 +1971,6 @@ func TestProcessWith(t *testing.T) {
 				Field *CustomDecoderType `env:"FIELD, decodeunset"`
 			}{
 				Field: &CustomDecoderType{
-					value: "CUSTOM-",
-				},
-			},
-			lookuper: MapLookuper(nil),
-		},
-
-		// Custom decoder - legacy
-		{
-			name: "custom_decoder/struct",
-			target: &struct {
-				Field CustomDecoderTypeLegacy `env:"FIELD"`
-			}{},
-			exp: &struct {
-				Field CustomDecoderTypeLegacy `env:"FIELD"`
-			}{
-				Field: CustomDecoderTypeLegacy{
-					value: "CUSTOM-foo",
-				},
-			},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo",
-			}),
-		},
-		{
-			name: "custom_decoder/pointer",
-			target: &struct {
-				Field *CustomDecoderTypeLegacy `env:"FIELD"`
-			}{},
-			exp: &struct {
-				Field *CustomDecoderTypeLegacy `env:"FIELD"`
-			}{
-				Field: &CustomDecoderTypeLegacy{
-					value: "CUSTOM-foo",
-				},
-			},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo",
-			}),
-		},
-		{
-			name: "custom_decoder/private",
-			target: &struct {
-				field *CustomDecoderTypeLegacy `env:"FIELD"`
-			}{},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo",
-			}),
-			err: ErrPrivateField,
-		},
-		{
-			name: "custom_decoder/error",
-			target: &struct {
-				Field CustomTypeError `env:"FIELD"`
-			}{},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "foo",
-			}),
-			errMsg: "broken",
-		},
-		{
-			name: "custom_decoder/called_for_empty_string",
-			target: &struct {
-				Field CustomTypeError `env:"FIELD"`
-			}{},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "",
-			}),
-			errMsg: "broken",
-		},
-		{
-			name: "custom_decoder/called_when_default",
-			target: &struct {
-				Field *CustomDecoderTypeLegacy `env:"FIELD, default=foo"`
-			}{},
-			exp: &struct {
-				Field *CustomDecoderTypeLegacy `env:"FIELD, default=foo"`
-			}{
-				Field: &CustomDecoderTypeLegacy{
-					value: "CUSTOM-foo",
-				},
-			},
-			lookuper: MapLookuper(nil),
-		},
-		{
-			name: "custom_decoder/called_on_decodeunset",
-			target: &struct {
-				Field *CustomDecoderTypeLegacy `env:"FIELD, decodeunset"`
-			}{},
-			exp: &struct {
-				Field *CustomDecoderTypeLegacy `env:"FIELD, decodeunset"`
-			}{
-				Field: &CustomDecoderTypeLegacy{
 					value: "CUSTOM-",
 				},
 			},
@@ -2571,28 +2459,6 @@ func TestProcessWith(t *testing.T) {
 				}),
 			},
 			errMsg: "error 1",
-		},
-		{
-			name: "mutate/legacy_continues_chain",
-			target: &struct {
-				Field string `env:"FIELD"`
-			}{},
-			exp: &struct {
-				Field string `env:"FIELD"`
-			}{
-				Field: "s12",
-			},
-			lookuper: MapLookuper(map[string]string{
-				"FIELD": "s",
-			}),
-			mutators: []Mutator{
-				LegacyMutatorFunc(func(_ context.Context, k, v string) (string, error) {
-					return v + "1", nil
-				}),
-				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
-					return cVal + "2", false, nil
-				}),
-			},
 		},
 		{
 			name: "mutate/struct_decoder_url",
@@ -3976,9 +3842,6 @@ func TestProcessWith(t *testing.T) {
 			opts := cmp.AllowUnexported(
 				// Custom decoder type
 				CustomDecoderType{},
-
-				// Custom decoder type - legacy
-				CustomDecoderTypeLegacy{},
 
 				// Custom standard library interfaces decoder type
 				CustomStdLibDecodingType{},

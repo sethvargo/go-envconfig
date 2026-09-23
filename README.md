@@ -34,7 +34,7 @@ import (
   "context"
   "log"
 
-  "github.com/sethvargo/go-envconfig"
+  "github.com/sethvargo/go-envconfig/v2"
 )
 
 func main() {
@@ -335,4 +335,4 @@ You can also combine multiple lookupers with `MultiLookuper`. See the GoDoc for
 more information and examples.
 
 
-[godoc]: https://pkg.go.dev/mod/github.com/sethvargo/go-envconfig
+[godoc]: https://pkg.go.dev/mod/github.com/sethvargo/go-envconfig/v2

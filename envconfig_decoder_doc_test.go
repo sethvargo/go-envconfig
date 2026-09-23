@@ -15,10 +15,11 @@
 package envconfig_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/sethvargo/go-envconfig"
+	"github.com/sethvargo/go-envconfig/v2"
 )
 
 type CustomStruct struct {
@@ -27,7 +28,7 @@ type CustomStruct struct {
 	Max  int    `json:"max"`
 }
 
-func (s *CustomStruct) EnvDecode(val string) error {
+func (s *CustomStruct) EnvDecode(ctx context.Context, val string) error {
 	return json.Unmarshal([]byte(val), s)
 }
 

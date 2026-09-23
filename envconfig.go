@@ -27,13 +27,13 @@
 //	}
 //
 // All built-in types are supported except Func and Chan. If you need to define
-// a custom decoder, implement Decoder:
+// a custom decoder, implement DecoderCtx:
 //
 //	type MyStruct struct {
 //	  field string
 //	}
 //
-//	func (v *MyStruct) EnvDecode(val string) error {
+//	func (v *MyStruct) EnvDecode(ctx context.Context, val string) error {
 //	  v.field = fmt.Sprintf("PREFIX-%s", val)
 //	  return nil
 //	}
@@ -228,13 +228,6 @@ func MultiLookuper(lookupers ...Lookuper) Lookuper {
 // underlying key (used by the [PrefixLookuper] or custom implementations).
 type keyedLookuper interface {
 	Key(key string) string
-}
-
-// Decoder is the legacy implementation of [DecoderCtx], but it does not accept
-// a context as the first parameter to `EnvDecode`. Please use [DecoderCtx]
-// instead, as this will be removed in a future release.
-type Decoder interface {
-	EnvDecode(val string) error
 }
 
 // DecoderCtx is an interface that custom types/fields can implement to control
@@ -849,7 +842,7 @@ func implementsDecoder(ef reflect.Value) bool {
 	}
 
 	switch ef.Interface().(type) {
-	case DecoderCtx, Decoder, encoding.TextUnmarshaler, json.Unmarshaler, encoding.BinaryUnmarshaler, gob.GobDecoder:
+	case DecoderCtx, encoding.TextUnmarshaler, json.Unmarshaler, encoding.BinaryUnmarshaler, gob.GobDecoder:
 		return true
 	default:
 		return false
@@ -873,20 +866,13 @@ func processAsDecoder(ctx context.Context, v string, ef reflect.Value) (bool, er
 	if ef.CanInterface() {
 		iface := ef.Interface()
 
-		// If a developer chooses to implement the Decoder interface on a type,
+		// If a developer chooses to implement the DecoderCtx interface on a type,
 		// never attempt to use other decoders in case of failure. EnvDecode's
 		// decoding logic is "the right one", and the error returned (if any)
 		// is the most specific we can get.
 		if dec, ok := iface.(DecoderCtx); ok {
 			imp = true
 			err = dec.EnvDecode(ctx, v)
-			return imp, err
-		}
-
-		// Check legacy decoder implementation
-		if dec, ok := iface.(Decoder); ok {
-			imp = true
-			err = dec.EnvDecode(v)
 			return imp, err
 		}
 

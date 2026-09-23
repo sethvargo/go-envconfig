@@ -15,6 +15,7 @@
 package envconfig
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"strings"
@@ -24,8 +25,8 @@ import (
 // the environment variable.
 type Base64Bytes []byte
 
-// EnvDecode implements env.Decoder.
-func (b *Base64Bytes) EnvDecode(val string) error {
+// EnvDecode implements [DecoderCtx].
+func (b *Base64Bytes) EnvDecode(ctx context.Context, val string) error {
 	val = strings.ReplaceAll(val, "+", "-")
 	val = strings.ReplaceAll(val, "/", "_")
 	val = strings.TrimRight(val, "=")
@@ -44,8 +45,8 @@ func (b Base64Bytes) Bytes() []byte {
 // environment variable.
 type HexBytes []byte
 
-// EnvDecode implements env.Decoder.
-func (b *HexBytes) EnvDecode(val string) error {
+// EnvDecode implements [DecoderCtx].
+func (b *HexBytes) EnvDecode(ctx context.Context, val string) error {
 	var err error
 	*b, err = hex.DecodeString(val)
 	return err
