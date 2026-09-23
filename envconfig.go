@@ -531,9 +531,17 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 					continue
 				}
 
+				// Apply mutators before decoding, matching the non-struct path.
+				if found || usedDefault {
+					val, err = applyMutators(ctx, mutators, l, key, val)
+					if err != nil {
+						return fmt.Errorf("%s: %w", tf.Name, err)
+					}
+				}
+
 				if ok, err := processAsDecoder(ctx, val, ef); ok {
 					if err != nil {
-						return err
+						return fmt.Errorf("%s: %w", tf.Name, err)
 					}
 
 					setNilStruct(ef)
@@ -595,23 +603,10 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 		// Apply any mutators. Mutators are applied after the lookup, but before any
 		// type conversions. They always resolve to a string (or error), so we don't
 		// call mutators when the environment variable was not set.
-		if len(mutators) > 0 && (found || usedDefault) {
-			originalKey := key
-			resolvedKey := originalKey
-			if keyer, ok := l.(keyedLookuper); ok {
-				resolvedKey = keyer.Key(resolvedKey)
-			}
-			originalValue := val
-			stop := false
-
-			for _, mu := range mutators {
-				val, stop, err = mu.EnvMutate(ctx, originalKey, resolvedKey, originalValue, val)
-				if err != nil {
-					return fmt.Errorf("%s: %w", tf.Name, err)
-				}
-				if stop {
-					break
-				}
+		if found || usedDefault {
+			val, err = applyMutators(ctx, mutators, l, key, val)
+			if err != nil {
+				return fmt.Errorf("%s: %w", tf.Name, err)
 			}
 		}
 
@@ -933,6 +928,33 @@ func nonPointerType(t reflect.Type) (reflect.Type, bool) {
 		}
 	}
 	return fast, true
+}
+
+// applyMutators runs mutators over val in order, stopping when one asks to.
+// Callers gate this on found/usedDefault since mutators only see defined values.
+func applyMutators(ctx context.Context, mutators []Mutator, l Lookuper, key, val string) (string, error) {
+	if len(mutators) == 0 {
+		return val, nil
+	}
+
+	resolvedKey := key
+	if keyer, ok := l.(keyedLookuper); ok {
+		resolvedKey = keyer.Key(resolvedKey)
+	}
+
+	originalValue := val
+	for _, mu := range mutators {
+		var stop bool
+		var err error
+		val, stop, err = mu.EnvMutate(ctx, key, resolvedKey, originalValue, val)
+		if err != nil {
+			return val, err
+		}
+		if stop {
+			break
+		}
+	}
+	return val, nil
 }
 
 func processField(ctx context.Context, v string, ef reflect.Value, delimiter, separator string, noInit bool) error {
