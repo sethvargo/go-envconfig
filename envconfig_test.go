@@ -2474,6 +2474,28 @@ func TestProcessWith(t *testing.T) {
 			},
 			errMsg: "error 1",
 		},
+		{
+			name: "mutate/legacy_continues_chain",
+			target: &struct {
+				Field string `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD"`
+			}{
+				Field: "s12",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "s",
+			}),
+			mutators: []Mutator{
+				LegacyMutatorFunc(func(_ context.Context, k, v string) (string, error) {
+					return v + "1", nil
+				}),
+				MutatorFunc(func(_ context.Context, oKey, rKey, oVal, cVal string) (string, bool, error) {
+					return cVal + "2", false, nil
+				}),
+			},
+		},
 
 		// Nesting
 		{
