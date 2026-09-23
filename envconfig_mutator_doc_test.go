@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sethvargo/go-envconfig"
+	"github.com/sethvargo/go-envconfig/v2"
 )
 
 // MyMutator is a mutator that keeps a count of all mutated values, appending
