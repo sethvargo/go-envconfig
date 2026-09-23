@@ -3129,6 +3129,38 @@ func TestProcessWith(t *testing.T) {
 			lookuper:    MapLookuper(nil),
 			err:         ErrMissingRequired,
 		},
+		{
+			name: "global/required_allows_default",
+			target: &struct {
+				Port int `env:"PORT,default=8080"`
+			}{},
+			exp: &struct {
+				Port int `env:"PORT,default=8080"`
+			}{
+				Port: 8080,
+			},
+			defRequired: true,
+			lookuper:    MapLookuper(nil),
+		},
+		{
+			name: "global/required_default_field_from_env",
+			target: &struct {
+				Port int    `env:"PORT,default=8080"`
+				Host string `env:"HOST"`
+			}{},
+			exp: &struct {
+				Port int    `env:"PORT,default=8080"`
+				Host string `env:"HOST"`
+			}{
+				Port: 9090,
+				Host: "example",
+			},
+			defRequired: true,
+			lookuper: MapLookuper(map[string]string{
+				"PORT": "9090",
+				"HOST": "example",
+			}),
+		},
 
 		// Issues - this section is specific to reproducing issues
 		{
