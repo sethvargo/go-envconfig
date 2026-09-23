@@ -1340,6 +1340,62 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(nil),
 		},
 
+		// Decoders skip unset variables
+		{
+			name: "decoder/unset_does_not_run_decoder",
+			target: &struct {
+				Field Level `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field Level `env:"FIELD"`
+			}{
+				Field: LevelDebug,
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/unset_base64_stays_nil",
+			target: &struct {
+				Field Base64Bytes `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field Base64Bytes `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/unset_hex_stays_nil",
+			target: &struct {
+				Field HexBytes `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field HexBytes `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/unset_url_stays_zero",
+			target: &struct {
+				Field url.URL `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field url.URL `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/unset_url_pointer_zero_value",
+			target: &struct {
+				Field *url.URL `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *url.URL `env:"FIELD"`
+			}{
+				Field: &url.URL{},
+			},
+			lookuper: MapLookuper(nil),
+		},
+
 		// Required
 		{
 			name: "required/present",
@@ -3176,6 +3232,27 @@ func TestProcessWith(t *testing.T) {
 				}
 			}{
 				Sub: &struct {
+					Level Level `env:"LEVEL"`
+				}{
+					Level: LevelInfo,
+				},
+			},
+			defDecodeUnset: true,
+			lookuper:       MapLookuper(nil),
+		},
+		{
+			name: "global/decodeunset_nested_prefix",
+			target: &struct {
+				Sub struct {
+					Level Level `env:"LEVEL"`
+				} `env:",prefix=SUB_"`
+			}{},
+			exp: &struct {
+				Sub struct {
+					Level Level `env:"LEVEL"`
+				} `env:",prefix=SUB_"`
+			}{
+				Sub: struct {
 					Level Level `env:"LEVEL"`
 				}{
 					Level: LevelInfo,

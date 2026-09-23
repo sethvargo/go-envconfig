@@ -17,7 +17,6 @@ package envconfig_test
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -246,13 +245,34 @@ func Example_noinit() {
 	// secureB: <nil>
 }
 
+// logLevel decodes a log level. The empty string maps to info.
+type logLevel int
+
+const (
+	levelDebug logLevel = iota
+	levelInfo
+)
+
+func (l *logLevel) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case "debug":
+		*l = levelDebug
+	case "info", "":
+		*l = levelInfo
+	default:
+		return fmt.Errorf("invalid level %q", text)
+	}
+	return nil
+}
+
 func Example_decodeunset() {
 	// This example demonstrates forcing envconfig to run decoders, even on unset
-	// environment variables.
+	// environment variables. LevelA is skipped because its variable is unset, and
+	// decodeunset forces LevelB's decoder to run on the empty string.
 
 	type MyStruct struct {
-		UrlA *url.URL `env:"URL_A"`
-		UrlB *url.URL `env:"URL_B, decodeunset"`
+		LevelA logLevel `env:"LEVEL_A"`
+		LevelB logLevel `env:"LEVEL_B, decodeunset"`
 	}
 
 	var s MyStruct
@@ -260,12 +280,12 @@ func Example_decodeunset() {
 		panic(err)
 	}
 
-	fmt.Printf("urlA: %s\n", s.UrlA)
-	fmt.Printf("urlB: %s\n", s.UrlB)
+	fmt.Printf("levelA: %d\n", s.LevelA)
+	fmt.Printf("levelB: %d\n", s.LevelB)
 
 	// Output:
-	// urlA: //@
-	// urlB:
+	// levelA: 0
+	// levelB: 1
 }
 
 func Example_mutatorFunc() {
