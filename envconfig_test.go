@@ -3736,6 +3736,39 @@ func TestProcessWith(t *testing.T) {
 			err:    ErrRecursivePointer,
 			errMsg: "envconfig.selfPointer: pointer type is recursive",
 		},
+
+		{
+			name: "unsupported/struct_slice_element",
+			target: &struct {
+				Field []struct {
+					X int `env:"X"`
+				} `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "a,b",
+			}),
+			err: ErrUnsupportedType,
+		},
+		{
+			name: "unsupported/func_field",
+			target: &struct {
+				Field func() `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "x",
+			}),
+			err: ErrUnsupportedType,
+		},
+		{
+			name: "unsupported/chan_field",
+			target: &struct {
+				Field chan int `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "x",
+			}),
+			err: ErrUnsupportedType,
+		},
 	}
 
 	for _, tc := range cases {

@@ -101,6 +101,7 @@ const (
 	ErrRecursiveStruct    = internalError("struct type is recursive")
 	ErrRequiredAndDefault = internalError("field cannot be required and have a default value")
 	ErrUnknownOption      = internalError("unknown option")
+	ErrUnsupportedType    = internalError("unsupported type")
 )
 
 // Lookuper is an interface that provides a lookup for a string-based key.
@@ -1052,6 +1053,9 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 			}
 			ef.Set(s)
 		}
+
+	default:
+		return fmt.Errorf("%w: %s", ErrUnsupportedType, tf)
 	}
 
 	return nil
