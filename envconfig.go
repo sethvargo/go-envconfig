@@ -521,6 +521,15 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 			}
 
 			if found || usedDefault || decodeUnset {
+				// If the field already holds a non-zero value and overwrite is not
+				// enabled, don't decode the environment value over it. This mirrors the
+				// guard on the non-struct path below so that decoder types like
+				// time.Time and url.URL respect existing values.
+				if (pointerWasSet || !ef.Elem().IsZero()) && !overwrite && implementsDecoder(ef) {
+					setNilStruct(ef)
+					continue
+				}
+
 				if ok, err := processAsDecoder(ctx, val, ef); ok {
 					if err != nil {
 						return err
@@ -808,6 +817,26 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 	}
 
 	return val, found, false, nil
+}
+
+// implementsDecoder reports whether the given value implements any of the
+// decoder or custom unmarshaller interfaces that processAsDecoder handles,
+// without performing any decoding.
+func implementsDecoder(ef reflect.Value) bool {
+	for ef.CanAddr() {
+		ef = ef.Addr()
+	}
+
+	if !ef.CanInterface() {
+		return false
+	}
+
+	switch ef.Interface().(type) {
+	case DecoderCtx, Decoder, encoding.TextUnmarshaler, json.Unmarshaler, encoding.BinaryUnmarshaler, gob.GobDecoder:
+		return true
+	default:
+		return false
+	}
 }
 
 // processAsDecoder processes the given value as a decoder or custom
