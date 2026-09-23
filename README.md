@@ -103,11 +103,12 @@ examples.
     }
     ```
 
-    To have a literal backslash followed by a `$`, escape the backslash:
+    To include a literal backslash before a variable reference, escape the
+    backslash by doubling it. The `$name` that follows is still expanded:
 
     ```go
     type MyStruct struct {
-      Filepath string `env:"FILEPATH, default=C:\\Personal\\\\$name"` // Default: C:\Personal\$name
+      Filepath string `env:"FILEPATH, default=C:\\Personal\\\\$name"` // Default: C:\Personal\ followed by the value of $name
     }
     ```
 
