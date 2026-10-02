@@ -4348,3 +4348,70 @@ func TestKeyAndOpts(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessWithNamedByteSlices(t *testing.T) {
+	t.Parallel()
+	type byteValue uint8
+	type byteSlice []byteValue
+	cases := []struct {
+		name   string
+		target any
+		want   any
+	}{
+		{"element", &struct {
+			Value []byteValue `env:"VALUE"`
+		}{},
+			&struct {
+				Value []byteValue `env:"VALUE"`
+			}{[]byteValue{104, 195, 169, 0}}},
+		{"slice", &struct {
+			Value byteSlice `env:"VALUE"`
+		}{},
+			&struct {
+				Value byteSlice `env:"VALUE"`
+			}{byteSlice{104, 195, 169, 0}}},
+		{"pointer", &struct {
+			Value *byteSlice `env:"VALUE"`
+		}{},
+			&struct {
+				Value *byteSlice `env:"VALUE"`
+			}{func() *byteSlice { v := byteSlice{104, 195, 169, 0}; return &v }()}},
+		{"map", &struct {
+			Value map[string]byteSlice `env:"VALUE"`
+		}{},
+			&struct {
+				Value map[string]byteSlice `env:"VALUE"`
+			}{map[string]byteSlice{"key": {104, 195, 169, 0}}}},
+		{"nested_slice", &struct {
+			Value []byteSlice `env:"VALUE"`
+		}{},
+			&struct {
+				Value []byteSlice `env:"VALUE"`
+			}{[]byteSlice{{104, 195, 169, 0}}}},
+		{"default", &struct {
+			Value byteSlice `env:"VALUE,default=hé"`
+		}{},
+			&struct {
+				Value byteSlice `env:"VALUE,default=hé"`
+			}{byteSlice{104, 195, 169}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			values := map[string]string{"VALUE": "hé\x00"}
+			if tc.name == "map" {
+				values["VALUE"] = "key:hé\x00"
+			}
+			if tc.name == "default" {
+				delete(values, "VALUE")
+			}
+			err := ProcessWith(context.Background(), &Config{Target: tc.target, Lookuper: MapLookuper(values)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if diff := cmp.Diff(tc.want, tc.target); diff != "" {
+				t.Errorf("wrong value (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
