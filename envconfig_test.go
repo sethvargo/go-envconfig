@@ -373,6 +373,9 @@ func TestProcessWithConfigArgument(t *testing.T) {
 func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
+	type byteValue uint8
+	type byteSlice []byteValue
+
 	cases := []struct {
 		name           string
 		target         any
@@ -3164,6 +3167,91 @@ func TestProcessWith(t *testing.T) {
 			defRequired: true,
 			lookuper:    MapLookuper(nil),
 			err:         ErrMissingRequired,
+		},
+
+		// Slices of named byte types
+		// https://github.com/sethvargo/go-envconfig/pull/155
+		{
+			name: "named_byte_slices/element",
+			target: &struct {
+				Field []byteValue `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field []byteValue `env:"FIELD"`
+			}{
+				Field: []byteValue{104, 195, 169, 0},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/slice",
+			target: &struct {
+				Field byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field byteSlice `env:"FIELD"`
+			}{
+				Field: byteSlice{104, 195, 169, 0},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/pointer",
+			target: &struct {
+				Field *byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *byteSlice `env:"FIELD"`
+			}{
+				Field: ptrTo(byteSlice{104, 195, 169, 0}),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/map",
+			target: &struct {
+				Field map[string]byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field map[string]byteSlice `env:"FIELD"`
+			}{
+				Field: map[string]byteSlice{"key": {104, 195, 169, 0}},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "key:hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/nested_slice",
+			target: &struct {
+				Field []byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field []byteSlice `env:"FIELD"`
+			}{
+				Field: []byteSlice{{104, 195, 169, 0}},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/default",
+			target: &struct {
+				Field byteSlice `env:"FIELD,default=hé"`
+			}{},
+			exp: &struct {
+				Field byteSlice `env:"FIELD,default=hé"`
+			}{
+				Field: byteSlice{104, 195, 169},
+			},
+			lookuper: MapLookuper(nil),
 		},
 
 		// Issues - this section is specific to reproducing issues

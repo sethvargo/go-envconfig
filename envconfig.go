@@ -1070,7 +1070,7 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 	case reflect.Slice:
 		// Special case: []byte
 		if tf.Elem().Kind() == reflect.Uint8 {
-			ef.Set(reflect.ValueOf([]byte(v)))
+			ef.SetBytes([]byte(v))
 		} else {
 			vals := strings.Split(v, delimiter)
 			s := reflect.MakeSlice(tf, len(vals), len(vals))
