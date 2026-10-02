@@ -373,6 +373,9 @@ func TestProcessWithConfigArgument(t *testing.T) {
 func TestProcessWith(t *testing.T) {
 	t.Parallel()
 
+	type byteValue uint8
+	type byteSlice []byteValue
+
 	cases := []struct {
 		name           string
 		target         any
@@ -3166,6 +3169,91 @@ func TestProcessWith(t *testing.T) {
 			err:         ErrMissingRequired,
 		},
 
+		// Slices of named byte types
+		// https://github.com/sethvargo/go-envconfig/pull/155
+		{
+			name: "named_byte_slices/element",
+			target: &struct {
+				Field []byteValue `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field []byteValue `env:"FIELD"`
+			}{
+				Field: []byteValue{104, 195, 169, 0},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/slice",
+			target: &struct {
+				Field byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field byteSlice `env:"FIELD"`
+			}{
+				Field: byteSlice{104, 195, 169, 0},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/pointer",
+			target: &struct {
+				Field *byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *byteSlice `env:"FIELD"`
+			}{
+				Field: ptrTo(byteSlice{104, 195, 169, 0}),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/map",
+			target: &struct {
+				Field map[string]byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field map[string]byteSlice `env:"FIELD"`
+			}{
+				Field: map[string]byteSlice{"key": {104, 195, 169, 0}},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "key:hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/nested_slice",
+			target: &struct {
+				Field []byteSlice `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field []byteSlice `env:"FIELD"`
+			}{
+				Field: []byteSlice{{104, 195, 169, 0}},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "hé\x00",
+			}),
+		},
+		{
+			name: "named_byte_slices/default",
+			target: &struct {
+				Field byteSlice `env:"FIELD,default=hé"`
+			}{},
+			exp: &struct {
+				Field byteSlice `env:"FIELD,default=hé"`
+			}{
+				Field: byteSlice{104, 195, 169},
+			},
+			lookuper: MapLookuper(nil),
+		},
+
 		// Issues - this section is specific to reproducing issues
 		{
 			// github.com/sethvargo/go-envconfig/issues/13
@@ -4344,73 +4432,6 @@ func TestKeyAndOpts(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.opts, opts); diff != "" {
 				t.Errorf("opts mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestProcessWithNamedByteSlices(t *testing.T) {
-	t.Parallel()
-	type byteValue uint8
-	type byteSlice []byteValue
-	cases := []struct {
-		name   string
-		target any
-		want   any
-	}{
-		{"element", &struct {
-			Value []byteValue `env:"VALUE"`
-		}{},
-			&struct {
-				Value []byteValue `env:"VALUE"`
-			}{[]byteValue{104, 195, 169, 0}}},
-		{"slice", &struct {
-			Value byteSlice `env:"VALUE"`
-		}{},
-			&struct {
-				Value byteSlice `env:"VALUE"`
-			}{byteSlice{104, 195, 169, 0}}},
-		{"pointer", &struct {
-			Value *byteSlice `env:"VALUE"`
-		}{},
-			&struct {
-				Value *byteSlice `env:"VALUE"`
-			}{func() *byteSlice { v := byteSlice{104, 195, 169, 0}; return &v }()}},
-		{"map", &struct {
-			Value map[string]byteSlice `env:"VALUE"`
-		}{},
-			&struct {
-				Value map[string]byteSlice `env:"VALUE"`
-			}{map[string]byteSlice{"key": {104, 195, 169, 0}}}},
-		{"nested_slice", &struct {
-			Value []byteSlice `env:"VALUE"`
-		}{},
-			&struct {
-				Value []byteSlice `env:"VALUE"`
-			}{[]byteSlice{{104, 195, 169, 0}}}},
-		{"default", &struct {
-			Value byteSlice `env:"VALUE,default=hé"`
-		}{},
-			&struct {
-				Value byteSlice `env:"VALUE,default=hé"`
-			}{byteSlice{104, 195, 169}}},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			values := map[string]string{"VALUE": "hé\x00"}
-			if tc.name == "map" {
-				values["VALUE"] = "key:hé\x00"
-			}
-			if tc.name == "default" {
-				delete(values, "VALUE")
-			}
-			err := ProcessWith(context.Background(), &Config{Target: tc.target, Lookuper: MapLookuper(values)})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(tc.want, tc.target); diff != "" {
-				t.Errorf("wrong value (-want +got):\n%s", diff)
 			}
 		})
 	}
