@@ -1479,6 +1479,46 @@ func TestProcessWith(t *testing.T) {
 
 		// Default
 		{
+			name: "default/missing_tab_string",
+			target: &struct {
+				Field string `env:"FIELD,\tdefault=foo"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,\tdefault=foo"`
+			}{Field: "foo"},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "default/missing_tab_integer",
+			target: &struct {
+				Field int `env:"FIELD,\tdefault=7"`
+			}{},
+			exp: &struct {
+				Field int `env:"FIELD,\tdefault=7"`
+			}{Field: 7},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "default/missing_tab_escaped_comma",
+			target: &struct {
+				Field string `env:"FIELD,\tdefault=foo\\,bar"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,\tdefault=foo\\,bar"`
+			}{Field: "foo,bar"},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "default/missing_unicode_whitespace_preserves_value",
+			target: &struct {
+				Field string `env:"FIELD,\u00a0\u2003default= foo \t"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,\u00a0\u2003default= foo \t"`
+			}{Field: " foo \t"},
+			lookuper: MapLookuper(nil),
+		},
+		{
 			name: "default/missing",
 			target: &struct {
 				Field string `env:"FIELD,default=foo"`
@@ -4357,6 +4397,42 @@ func TestKeyAndOpts(t *testing.T) {
 			opts: options{
 				Default: "foo,bar",
 			},
+		},
+		{
+			name: "default_leading_tab",
+			tag:  "FIELD,\tdefault=foo",
+			key:  "FIELD",
+			opts: options{Default: "foo"},
+		},
+		{
+			name: "default_leading_newline",
+			tag:  "FIELD,\ndefault=foo",
+			key:  "FIELD",
+			opts: options{Default: "foo"},
+		},
+		{
+			name: "default_unicode_whitespace_preserves_value",
+			tag:  "FIELD,\u00a0\u2003default= foo \t",
+			key:  "FIELD",
+			opts: options{Default: " foo \t"},
+		},
+		{
+			name: "default_escaped_leading_tab",
+			tag:  "FIELD,\tdefault=a\\,b",
+			key:  "FIELD",
+			opts: options{Default: "a,b"},
+		},
+		{
+			name: "default_escaped_unicode_whitespace_preserves_value",
+			tag:  "FIELD,\u00a0\u2003default= a\\,b \t",
+			key:  "FIELD",
+			opts: options{Default: " a,b \t"},
+		},
+		{
+			name: "default_after_keyword_with_whitespace",
+			tag:  "FIELD,overwrite,\tdefault=foo",
+			key:  "FIELD",
+			opts: options{Overwrite: true, Default: "foo"},
 		},
 		{
 			name: "default_escaped_comma",

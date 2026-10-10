@@ -678,7 +678,7 @@ func keyAndOpts(tag string) (string, options, error) {
 				return "", opts, err
 			}
 			if isDefault {
-				o = strings.TrimLeft(strings.Join(tagOpts[i:], ","), " ")
+				o = strings.TrimLeftFunc(strings.Join(tagOpts[i:], ","), unicode.IsSpace)
 				opts.Default = strings.TrimPrefix(o, optDefault)
 				break
 			}
@@ -705,7 +705,7 @@ func keyAndOpts(tag string) (string, options, error) {
 		// A default option consumes the remainder of the tag verbatim, including
 		// any commas, so extract it directly and stop.
 		if hasPrefixFold(strings.TrimLeftFunc(seg, unicode.IsSpace), optDefault) {
-			o := strings.TrimLeft(rest, " ")
+			o := strings.TrimLeftFunc(rest, unicode.IsSpace)
 			opts.Default = strings.TrimPrefix(o, optDefault)
 			break
 		}
