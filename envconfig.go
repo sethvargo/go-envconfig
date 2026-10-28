@@ -515,11 +515,10 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 			}
 
 			if found || usedDefault || decodeUnset {
-				// If the field already holds a non-zero value and overwrite is not
-				// enabled, don't decode the environment value over it. This mirrors the
-				// guard on the non-struct path below so that decoder types like
-				// time.Time and url.URL respect existing values.
-				if (pointerWasSet || !ef.Elem().IsZero()) && !overwrite && implementsDecoder(ef) {
+				// Preserve existing decoder values unless overwrite is enabled and
+				// an environment value was provided. Defaults have lower precedence
+				// than existing values, matching the non-struct path below.
+				if (pointerWasSet || !ef.Elem().IsZero()) && (!overwrite || !found) && implementsDecoder(ef) {
 					setNilStruct(ef)
 					continue
 				}
