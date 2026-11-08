@@ -1045,21 +1045,21 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 	case reflect.Map:
 		vals := strings.Split(v, delimiter)
 		mp := reflect.MakeMapWithSize(tf, len(vals))
-		for _, val := range vals {
+		for i, val := range vals {
 			mKey, mVal, ok := strings.Cut(val, separator)
 			if !ok {
-				return fmt.Errorf("%s: %w", val, ErrInvalidMapItem)
+				return fmt.Errorf("item %d: %w", i, ErrInvalidMapItem)
 			}
 			mKey, mVal = strings.TrimSpace(mKey), strings.TrimSpace(mVal)
 
 			k := reflect.New(tf.Key()).Elem()
 			if err := processField(ctx, mKey, k, delimiter, separator, noInit); err != nil {
-				return fmt.Errorf("%s: %w", mKey, err)
+				return fmt.Errorf("item %d key: %w", i, err)
 			}
 
 			v := reflect.New(tf.Elem()).Elem()
 			if err := processField(ctx, mVal, v, delimiter, separator, noInit); err != nil {
-				return fmt.Errorf("%s: %w", mVal, err)
+				return fmt.Errorf("item %d value: %w", i, err)
 			}
 
 			mp.SetMapIndex(k, v)
@@ -1077,7 +1077,7 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 			for i, val := range vals {
 				val = strings.TrimSpace(val)
 				if err := processField(ctx, val, s.Index(i), delimiter, separator, noInit); err != nil {
-					return fmt.Errorf("%s: %w", val, err)
+					return fmt.Errorf("item %d: %w", i, err)
 				}
 			}
 			ef.Set(s)
