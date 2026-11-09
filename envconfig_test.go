@@ -868,7 +868,7 @@ func TestProcessWith(t *testing.T) {
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "a:b,foo",
 			}),
-			errMsg: "Field: item 1: invalid map item",
+			errMsg: "Field: item 1 (foo): invalid map item",
 		},
 		{
 			name: "map/key_error",
