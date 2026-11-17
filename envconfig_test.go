@@ -1333,6 +1333,137 @@ func TestProcessWith(t *testing.T) {
 
 		// Decoders skip unset variables
 		{
+			name: "decoder/nil_pointer_level_1_unset",
+			target: &struct {
+				Field *Level `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *Level `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/nil_pointer_level_1_empty",
+			target: &struct {
+				Field *Level `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *Level `env:"FIELD"`
+			}{Field: ptrTo(LevelInfo)},
+			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+		},
+		{
+			name: "decoder/nil_pointer_level_2_unset",
+			target: &struct {
+				Field **Level `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field **Level `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/nil_pointer_level_2_empty",
+			target: &struct {
+				Field **Level `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field **Level `env:"FIELD"`
+			}{Field: ptrTo(ptrTo(LevelInfo))},
+			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+		},
+		{
+			name: "decoder/nil_pointer_base64_1_unset",
+			target: &struct {
+				Field *Base64Bytes `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *Base64Bytes `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/nil_pointer_base64_1_empty",
+			target: &struct {
+				Field *Base64Bytes `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *Base64Bytes `env:"FIELD"`
+			}{Field: ptrTo(Base64Bytes{})},
+			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+		},
+		{
+			name: "decoder/nil_pointer_base64_2_unset",
+			target: &struct {
+				Field **Base64Bytes `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field **Base64Bytes `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/nil_pointer_base64_2_empty",
+			target: &struct {
+				Field **Base64Bytes `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field **Base64Bytes `env:"FIELD"`
+			}{Field: ptrTo(ptrTo(Base64Bytes{}))},
+			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+		},
+		{
+			name: "decoder/nil_pointer_decodeunset",
+			target: &struct {
+				Field *Level `env:"FIELD,decodeunset"`
+			}{},
+			exp: &struct {
+				Field *Level `env:"FIELD,decodeunset"`
+			}{Field: ptrTo(LevelInfo)},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/nil_pointer_global_decodeunset",
+			target: &struct {
+				Field *Level `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *Level `env:"FIELD"`
+			}{Field: ptrTo(LevelInfo)},
+			lookuper:       MapLookuper(nil),
+			defDecodeUnset: true,
+		},
+		{
+			name: "decoder/nil_pointer_default",
+			target: &struct {
+				Field *Level `env:"FIELD,default=info"`
+			}{},
+			exp: &struct {
+				Field *Level `env:"FIELD,default=info"`
+			}{Field: ptrTo(LevelInfo)},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "decoder/nil_pointer_noinit",
+			target: &struct {
+				Field *Level `env:"FIELD,noinit"`
+			}{},
+			exp: &struct {
+				Field *Level `env:"FIELD,noinit"`
+			}{Field: nil},
+			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+		},
+		{
+			name: "decoder/nil_pointer_present",
+			target: &struct {
+				Field *Level `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field *Level `env:"FIELD"`
+			}{Field: ptrTo(LevelError)},
+			lookuper: MapLookuper(map[string]string{"FIELD": "error"}),
+		},
+		{
 			name: "decoder/unset_does_not_run_decoder",
 			target: &struct {
 				Field Level `env:"FIELD"`
