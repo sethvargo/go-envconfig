@@ -1349,8 +1349,12 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field *Level `env:"FIELD"`
-			}{Field: ptrTo(LevelInfo)},
-			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+			}{
+				Field: ptrTo(LevelInfo),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
 		},
 		{
 			name: "decoder/nil_pointer_level_2_unset",
@@ -1369,8 +1373,12 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field **Level `env:"FIELD"`
-			}{Field: ptrTo(ptrTo(LevelInfo))},
-			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+			}{
+				Field: ptrTo(ptrTo(LevelInfo)),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
 		},
 		{
 			name: "decoder/nil_pointer_base64_1_unset",
@@ -1389,8 +1397,12 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field *Base64Bytes `env:"FIELD"`
-			}{Field: ptrTo(Base64Bytes{})},
-			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+			}{
+				Field: ptrTo(Base64Bytes{}),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
 		},
 		{
 			name: "decoder/nil_pointer_base64_2_unset",
@@ -1409,8 +1421,12 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field **Base64Bytes `env:"FIELD"`
-			}{Field: ptrTo(ptrTo(Base64Bytes{}))},
-			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+			}{
+				Field: ptrTo(ptrTo(Base64Bytes{})),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
 		},
 		{
 			name: "decoder/nil_pointer_decodeunset",
@@ -1419,7 +1435,9 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field *Level `env:"FIELD,decodeunset"`
-			}{Field: ptrTo(LevelInfo)},
+			}{
+				Field: ptrTo(LevelInfo),
+			},
 			lookuper: MapLookuper(nil),
 		},
 		{
@@ -1429,7 +1447,9 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field *Level `env:"FIELD"`
-			}{Field: ptrTo(LevelInfo)},
+			}{
+				Field: ptrTo(LevelInfo),
+			},
 			lookuper:       MapLookuper(nil),
 			defDecodeUnset: true,
 		},
@@ -1440,7 +1460,9 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field *Level `env:"FIELD,default=info"`
-			}{Field: ptrTo(LevelInfo)},
+			}{
+				Field: ptrTo(LevelInfo),
+			},
 			lookuper: MapLookuper(nil),
 		},
 		{
@@ -1450,8 +1472,12 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field *Level `env:"FIELD,noinit"`
-			}{Field: nil},
-			lookuper: MapLookuper(map[string]string{"FIELD": ""}),
+			}{
+				Field: nil,
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
 		},
 		{
 			name: "decoder/nil_pointer_present",
@@ -1460,8 +1486,12 @@ func TestProcessWith(t *testing.T) {
 			}{},
 			exp: &struct {
 				Field *Level `env:"FIELD"`
-			}{Field: ptrTo(LevelError)},
-			lookuper: MapLookuper(map[string]string{"FIELD": "error"}),
+			}{
+				Field: ptrTo(LevelError),
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "error",
+			}),
 		},
 		{
 			name: "decoder/unset_does_not_run_decoder",
