@@ -833,6 +833,16 @@ func lookup(key string, required bool, defaultValue string, l Lookuper) (string,
 // decoder or custom unmarshaller interfaces that processAsDecoder handles,
 // without performing any decoding.
 func implementsDecoder(ef reflect.Value) bool {
+	if ef.Kind() == reflect.Pointer {
+		// processField decodes through pointer chains. Inspect the same leaf
+		// method set without initializing a nil pointer or running its decoder.
+		t, ok := nonPointerType(ef.Type())
+		if !ok {
+			return false
+		}
+		ef = reflect.Zero(reflect.PointerTo(t))
+	}
+
 	for ef.CanAddr() {
 		ef = ef.Addr()
 	}
