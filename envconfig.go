@@ -441,7 +441,11 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 		noInit := structNoInit || opts.NoInit
 		overwrite := structOverwrite || opts.Overwrite
 		decodeUnset := structDecodeUnset || opts.DecodeUnset
-		required := structRequired || opts.Required
+		// DefaultRequired is only the default requiredness for fields: a field
+		// that declares its own default value is not required unless the tag
+		// explicitly demands it, otherwise every defaulted field would fail
+		// with ErrRequiredAndDefault.
+		required := (structRequired && opts.Default == "") || opts.Required
 
 		isNilStructPtr := false
 		var nilPtrOrigin, nilPtrChain reflect.Value

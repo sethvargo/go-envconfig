@@ -4673,3 +4673,45 @@ func TestKeyAndOpts(t *testing.T) {
 		})
 	}
 }
+
+// TestDefaultRequiredAllowsDefaults verifies that Config.DefaultRequired
+// does not turn fields that declare their own default value into
+// ErrRequiredAndDefault errors.
+func TestDefaultRequiredAllowsDefaults(t *testing.T) {
+	t.Parallel()
+
+	type config struct {
+		Host string `env:"APP_HOST,default=localhost"`
+		Must string `env:"APP_MUST"`
+	}
+
+	// The field without a default is still required; the defaulted field is not.
+	var cfg config
+	err := ProcessWith(context.Background(), &Config{
+		Target:          &cfg,
+		Lookuper:        MapLookuper(nil),
+		DefaultRequired: true,
+	})
+	if !errors.Is(err, ErrMissingRequired) {
+		t.Fatalf("expected ErrMissingRequired for the field without a default, got: %v", err)
+	}
+	if got, want := cfg.Host, "localhost"; got != want {
+		t.Fatalf("expected Host to use its default, got %q, want %q", got, want)
+	}
+
+	// Once the required field is provided, defaults still fill the rest.
+	var cfg2 config
+	if err := ProcessWith(context.Background(), &Config{
+		Target:          &cfg2,
+		Lookuper:        MapLookuper(map[string]string{"APP_MUST": "x"}),
+		DefaultRequired: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg2.Host, "localhost"; got != want {
+		t.Fatalf("expected Host to use its default, got %q, want %q", got, want)
+	}
+	if got, want := cfg2.Must, "x"; got != want {
+		t.Fatalf("expected Must to come from the environment, got %q, want %q", got, want)
+	}
+}
