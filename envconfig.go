@@ -506,6 +506,13 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 				ef = ef.Addr()
 			}
 
+			// Preserve existing decoder values before lookup, matching the
+			// non-struct path. A prefilled value also satisfies required.
+			if (pointerWasSet || !ef.Elem().IsZero()) && !overwrite && implementsDecoder(ef) {
+				setNilStruct(ef)
+				continue
+			}
+
 			// Lookup the value, ignoring an error if the key isn't defined. This is
 			// required for nested structs that don't declare their own `env` keys,
 			// but have internal fields with an `env` defined.
@@ -515,15 +522,6 @@ func processWith(ctx context.Context, c *Config, path map[reflect.Type]bool) err
 			}
 
 			if found || usedDefault || decodeUnset {
-				// If the field already holds a non-zero value and overwrite is not
-				// enabled, don't decode the environment value over it. This mirrors the
-				// guard on the non-struct path below so that decoder types like
-				// time.Time and url.URL respect existing values.
-				if (pointerWasSet || !ef.Elem().IsZero()) && !overwrite && implementsDecoder(ef) {
-					setNilStruct(ef)
-					continue
-				}
-
 				// Apply mutators before decoding, matching the non-struct path.
 				if found || usedDefault {
 					val, err = applyMutators(ctx, mutators, l, key, val)
