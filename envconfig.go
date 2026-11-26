@@ -1018,6 +1018,12 @@ func processField(ctx context.Context, v string, ef reflect.Value, delimiter, se
 			return err
 		}
 		ef.SetFloat(f)
+	case reflect.Complex64, reflect.Complex128:
+		c, err := strconv.ParseComplex(v, tf.Bits())
+		if err != nil {
+			return err
+		}
+		ef.SetComplex(c)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32:
 		i, err := strconv.ParseInt(v, 0, tf.Bits())
 		if err != nil {

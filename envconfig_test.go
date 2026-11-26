@@ -489,6 +489,66 @@ func TestProcessWith(t *testing.T) {
 			errMsg: "invalid syntax",
 		},
 
+		// Complex
+		{
+			name: "complex64/basic",
+			target: &struct {
+				Field complex64 `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field complex64 `env:"FIELD"`
+			}{
+				Field: 1 + 2i,
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "1+2i",
+			}),
+		},
+		{
+			name: "complex64/error",
+			target: &struct {
+				Field complex64 `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "not a valid complex",
+			}),
+			errMsg: "invalid syntax",
+		},
+		{
+			name: "complex64/out_of_range",
+			target: &struct {
+				Field complex64 `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "1e40+0i",
+			}),
+			errMsg: "value out of range",
+		},
+		{
+			name: "complex128/real_only",
+			target: &struct {
+				Field complex128 `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field complex128 `env:"FIELD"`
+			}{
+				Field: 6.022,
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "6.022",
+			}),
+		},
+		{
+			name: "complex128/error",
+			target: &struct {
+				Field complex128 `env:"FIELD"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "1+2j",
+			}),
+			errMsg: "invalid syntax",
+		},
+
 		// Int8-32
 		{
 			name: "int/8675309",
@@ -847,6 +907,20 @@ func TestProcessWith(t *testing.T) {
 			}),
 		},
 		{
+			name: "map/complex",
+			target: &struct {
+				Field map[string]complex64 `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field map[string]complex64 `env:"FIELD"`
+			}{
+				Field: map[string]complex64{"a": 1 + 2i, "b": -3i},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "a:1+2i,b:-3i",
+			}),
+		},
+		{
 			name: "map/empty",
 			target: &struct {
 				Field map[string]string `env:"FIELD"`
@@ -961,6 +1035,20 @@ func TestProcessWith(t *testing.T) {
 			},
 			lookuper: MapLookuper(map[string]string{
 				"FIELD": "foo,bar",
+			}),
+		},
+		{
+			name: "slice/complex",
+			target: &struct {
+				Field []complex128 `env:"FIELD"`
+			}{},
+			exp: &struct {
+				Field []complex128 `env:"FIELD"`
+			}{
+				Field: []complex128{1 + 2i, -3i},
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "1+2i, -3i",
 			}),
 		},
 		{
